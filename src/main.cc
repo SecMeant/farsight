@@ -50,8 +50,8 @@ int main()
 
 	fmt::print("Connecting to the device with serial: {}\n", serial);
 
-	auto pipeline	= std::make_unique<libfreenect2::OpenCLPacketPipeline>();
-	auto dev	= freenect2.openDevice(serial, pipeline.get());
+	auto pipeline	= new libfreenect2::OpenCLPacketPipeline;
+	auto dev	= freenect2.openDevice(serial, pipeline);
 
 	libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color);
 	libfreenect2::FrameMap frames;
@@ -69,6 +69,9 @@ int main()
 		, dev->getFirmwareVersion()
 	);
 
+	Viewer viewer;
+	viewer.initialize();
+
 	while (continue_flag.test_and_set())
 	{
 		if (!listener.waitForNewFrame(frames, 10*1000))
@@ -78,6 +81,9 @@ int main()
 		}
 
 		libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
+
+		viewer.addFrame("RGB", rgb);
+		viewer.render();
 
 		listener.release(frames);
 	}
