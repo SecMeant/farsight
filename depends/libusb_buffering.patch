@@ -1,0 +1,13 @@
+diff --git a/libusb/os/linux_usbfs.h b/libusb/os/linux_usbfs.h
+index 43fe11b..b7e85bc 100644
+--- a/libusb/os/linux_usbfs.h
++++ b/libusb/os/linux_usbfs.h
+@@ -81,7 +81,7 @@ struct usbfs_iso_packet_desc {
+ 	unsigned int status;
+ };
+ 
+-#define MAX_ISO_BUFFER_LENGTH		49152 * 128
++#define MAX_ISO_BUFFER_LENGTH		49152
+ #define MAX_BULK_BUFFER_LENGTH		16384
+ #define MAX_CTRL_BUFFER_LENGTH		4096
+ 

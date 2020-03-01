@@ -1,0 +1,2 @@
+MESA_GL_VERSION_OVERRIDE=1.40
+source init.sh
