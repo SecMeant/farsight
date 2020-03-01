@@ -60,7 +60,7 @@ int main()
 
 	fmt::print("Connecting to the device with serial: {}\n", serial);
 
-	auto pipeline	= new libfreenect2::OpenCLPacketPipeline;
+	auto pipeline	= new libfreenect2::OpenGLPacketPipeline;
 	auto dev	= freenect2.openDevice(serial, pipeline);
 
 	libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color);
