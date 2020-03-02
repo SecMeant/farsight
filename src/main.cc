@@ -67,12 +67,19 @@ main()
   auto dev = freenect2.openDevice(serial, pipeline);
 
   libfreenect2::SyncMultiFrameListener listener(
-    libfreenect2::Frame::Color);
+    libfreenect2::Frame::Color
+    | libfreenect2::Frame::Ir
+    | libfreenect2::Frame::Depth
+   );
   libfreenect2::FrameMap frames;
 
   dev->setColorFrameListener(&listener);
+  dev->setIrAndDepthFrameListener(&listener);
 
-  if (!dev->startStreams(true, false))
+  libfreenect2::Registration* registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
+  libfreenect2::Frame undistorted(512, 424, 4), registered(512, 424, 4);
+
+  if (!dev->start())
     return -1;
 
   fmt::print("Connecting to the device\n"
@@ -97,6 +104,10 @@ main()
     }
 
     libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
+    libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
+    libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
+
+    registration->apply(rgb, depth, &undistorted, &registered);
 
     if (' ' == sign)
     {
@@ -108,7 +119,11 @@ main()
     sign = waitKey(1);
 
     viewer.addFrame("RGB", rgb);
-    viewer.render();
+    viewer.addFrame("ir", ir);
+    viewer.addFrame("depth", depth);
+    viewer.addFrame("registered", &registered);
+    if (viewer.render())
+      continue_flag.clear();
 
     listener.release(frames);
   }
