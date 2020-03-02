@@ -14,7 +14,7 @@
 #include "viewer.h"
 
 std::atomic_flag continue_flag;
-const char *window_name = "kinnect_processed_image";
+const char *window_name = "kinnect_processed_image_rgb";
 
 extern "C"
 {
@@ -91,7 +91,7 @@ main()
   Viewer viewer;
   viewer.initialize();
 
-  Mat image;
+  Mat image_rgb, image_depth;
   char sign = '\0';
 
   while (continue_flag.test_and_set())
@@ -108,12 +108,15 @@ main()
     libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
 
     registration->apply(rgb, depth, &undistorted, &registered);
-
-    if (' ' == sign)
+    fmt::print("Format :{}", rgb->format);
+    //if (' ' == sign)
     {
-      image = Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-      process_image(image);
-      imshow(window_name, image);
+      image_rgb = Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
+      for(int i =0 ; i < depth->height*depth->width; i++)
+          *(reinterpret_cast<float*>(&depth->data[i*4]))/=4500;
+      image_depth = Mat(depth->height,depth->width, CV_32FC1, depth->data);
+      process_image(image_rgb);
+      imshow(window_name, image_depth);
     }
 
     sign = waitKey(1);
