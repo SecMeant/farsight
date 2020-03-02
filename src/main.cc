@@ -11,10 +11,9 @@
 #include <fmt/format.h>
 #include <memory>
 
-#include "viewer.h"
-
 std::atomic_flag continue_flag;
-const char *window_name = "kinnect_processed_image_rgb";
+const char *wnd_rgb = "wndrgb";
+const char *wnd_depth = "wnddepth";
 
 extern "C"
 {
@@ -37,14 +36,29 @@ sigint_handler(int signo)
 }
 
 void
-process_image(Mat &frame)
+rgb_process(libfreenect2::Frame *frame)
 {}
+
+void
+depth_process(libfreenect2::Frame *frame)
+{
+  auto total_size = frame->height * frame->width;
+  auto fp = reinterpret_cast<float *>(frame->data);
+
+  for (int i = 0; i < total_size; i++)
+  {
+    fp[i] /= 4500.0f;
+  }
+}
 
 int
 main()
 {
   continue_flag.test_and_set();
-  namedWindow(window_name, WINDOW_AUTOSIZE);
+
+  namedWindow(wnd_rgb, WINDOW_AUTOSIZE);
+  namedWindow(wnd_depth, WINDOW_AUTOSIZE);
+
   if (signal(SIGINT, sigint_handler) == SIG_ERR)
   {
     fmt::print("Failed to register signal handler.\n");
@@ -67,17 +81,12 @@ main()
   auto dev = freenect2.openDevice(serial, pipeline);
 
   libfreenect2::SyncMultiFrameListener listener(
-    libfreenect2::Frame::Color
-    | libfreenect2::Frame::Ir
-    | libfreenect2::Frame::Depth
-   );
+    libfreenect2::Frame::Color | libfreenect2::Frame::Ir |
+    libfreenect2::Frame::Depth);
   libfreenect2::FrameMap frames;
 
   dev->setColorFrameListener(&listener);
   dev->setIrAndDepthFrameListener(&listener);
-
-  libfreenect2::Registration* registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
-  libfreenect2::Frame undistorted(512, 424, 4), registered(512, 424, 4);
 
   if (!dev->start())
     return -1;
@@ -87,9 +96,6 @@ main()
              "Device firmware	: {}\n",
              dev->getSerialNumber(),
              dev->getFirmwareVersion());
-
-  Viewer viewer;
-  viewer.initialize();
 
   Mat image_rgb, image_depth;
   char sign = '\0';
@@ -107,26 +113,16 @@ main()
     libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
 
-    registration->apply(rgb, depth, &undistorted, &registered);
-    fmt::print("Format :{}", rgb->format);
-    //if (' ' == sign)
-    {
-      image_rgb = Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-      for(int i =0 ; i < depth->height*depth->width; i++)
-          *(reinterpret_cast<float*>(&depth->data[i*4]))/=4500;
-      image_depth = Mat(depth->height,depth->width, CV_32FC1, depth->data);
-      process_image(image_rgb);
-      imshow(window_name, image_depth);
-    }
+    rgb_process(rgb);
+    image_rgb = Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
+
+    depth_process(depth);
+    image_depth = Mat(depth->height, depth->width, CV_32FC1, depth->data);
+
+    imshow(wnd_rgb, image_rgb);
+    imshow(wnd_depth, image_depth);
 
     sign = waitKey(1);
-
-    viewer.addFrame("RGB", rgb);
-    viewer.addFrame("ir", ir);
-    viewer.addFrame("depth", depth);
-    viewer.addFrame("registered", &registered);
-    if (viewer.render())
-      continue_flag.clear();
 
     listener.release(frames);
   }
