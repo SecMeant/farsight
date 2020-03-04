@@ -15,6 +15,7 @@
 const char *wndname = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
+const char *wndname4 = "wnd4";
 
 using byte = unsigned char;
 
@@ -78,10 +79,6 @@ constexpr auto bfm_ctype = CV_8UC1;
 
 int main()
 {
-  cv::namedWindow(wndname, cv::WINDOW_AUTOSIZE);
-  cv::namedWindow(wndname2, cv::WINDOW_AUTOSIZE);
-  cv::namedWindow(wndname3, cv::WINDOW_AUTOSIZE);
-
   size_t depth_width = 512, depth_height = 424;
   size_t fsize_depth = depth_width * depth_height;
   size_t total_size_depth = fsize_depth * sizeof(float);
@@ -160,13 +157,16 @@ int main()
 
     image_rgb_gs_.convertTo(image_rgb_gs, CV_8UC1, 255, 1);
 
+    cv::Mat image_rgb_gs_th;
+    cv::threshold(image_rgb_gs, image_rgb_gs_th, 50, 255, cv::THRESH_BINARY);
+
     fmt::print("{}\n", image_rgb_gs_.channels());
     //for (auto &face : cubefaces) {
     auto &face = cubefaces[0]; {
       cv::Ptr<cv::FeatureDetector> det = cv::ORB::create();
 
       image_kp.clear();
-      det->detectAndCompute(image_rgb_gs, cv::noArray(), image_kp, image_desc);
+      det->detectAndCompute(image_rgb_gs_th, cv::noArray(), image_kp, image_desc);
 
       face_kp.clear();
       det->detectAndCompute(face, cv::noArray(), face_kp, face_desc);
@@ -174,25 +174,30 @@ int main()
       //image_desc.convertTo(image_desc, CV_32FC1);
       //face_desc.convertTo(face_desc, CV_32FC1);
 
-      auto bf = cv::BFMatcher(cv::NORM_HAMMING, false);
+      auto bf = cv::BFMatcher(cv::NORM_HAMMING, true);
       std::vector<cv::DMatch> matches;
       bf.match(image_desc, face_desc, matches);
 
-      //fmt::print("{}\n\n\n", image_desc);
+
+      std::sort(std::begin(matches), std::end(matches), [](auto &m1, auto &m2) {return m1.distance <= m2.distance;});
+
       fmt::print("Matches size: {}\n", matches.size());
       for (auto m : matches)
-        fmt::print("{}", m.distance);
+        fmt::print("{} ", m.distance);
       puts("\n");
 
+      cv::Mat image_matches;
+      cv::drawMatches(image_rgb_gs_th, image_kp, face, face_kp, matches, image_matches);
 
-      cv::imshow(wndname3, image_rgb_gs);
-      cv::waitKey(1);
+      cv::imshow(wndname4, image_matches);
+      cv::waitKey(50);
+      getchar();
     }
 
     cv::threshold(image_depth, image_th, 0.25f, 255.0f, cv::THRESH_BINARY);
 
-    cv::imshow(wndname, image_depth);
-    cv::imshow(wndname2, image_th);
+    //cv::imshow(wndname, image_depth);
+    //cv::imshow(wndname2, image_th);
     //cv::imshow(wndname3, image_rgb);
 
     cv::waitKey(20);
