@@ -2,6 +2,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/mat.hpp>
+#include <opencv2/features2d.hpp>
 
 #include <stdio.h>
 #include <memory>
@@ -9,6 +10,7 @@
 #include <cmath>
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 const char *wndname = "wnd";
 const char *wndname2 = "wnd2";
@@ -34,12 +36,12 @@ std::array<cv::Mat, cubeface_count> cubefaces;
 
 bool loadfaces()
 {
-  cubefaces[0] = cv::imread("media/cube_photo0.jpg", cv::IMREAD_COLOR);
-  cubefaces[1] = cv::imread("media/cube_photo1.jpg", cv::IMREAD_COLOR);
-  cubefaces[2] = cv::imread("media/cube_photo2.jpg", cv::IMREAD_COLOR);
-  cubefaces[3] = cv::imread("media/cube_photo3.jpg", cv::IMREAD_COLOR);
-  cubefaces[4] = cv::imread("media/cube_photo4.jpg", cv::IMREAD_COLOR);
-  cubefaces[5] = cv::imread("media/cube_photo5.jpg", cv::IMREAD_COLOR);
+  cubefaces[0] = cv::imread("media/cube_photo0.jpg", cv::IMREAD_GRAYSCALE);
+  cubefaces[1] = cv::imread("media/cube_photo1.jpg", cv::IMREAD_GRAYSCALE);
+  cubefaces[2] = cv::imread("media/cube_photo2.jpg", cv::IMREAD_GRAYSCALE);
+  cubefaces[3] = cv::imread("media/cube_photo3.jpg", cv::IMREAD_GRAYSCALE);
+  cubefaces[4] = cv::imread("media/cube_photo4.jpg", cv::IMREAD_GRAYSCALE);
+  cubefaces[5] = cv::imread("media/cube_photo5.jpg", cv::IMREAD_GRAYSCALE);
 
   for (auto i = 0; i < cubeface_count; ++i)
     if(!cubefaces[i].data)
@@ -72,13 +74,13 @@ void conv8UC4To32FC4(byte *data, size_t size)
 
 }
 
+constexpr auto bfm_ctype = CV_8UC1;
+
 int main()
 {
   cv::namedWindow(wndname, cv::WINDOW_AUTOSIZE);
   cv::namedWindow(wndname2, cv::WINDOW_AUTOSIZE);
   cv::namedWindow(wndname3, cv::WINDOW_AUTOSIZE);
-
-  cv::Mat tmatch;
 
   size_t depth_width = 512, depth_height = 424;
   size_t fsize_depth = depth_width * depth_height;
@@ -97,7 +99,11 @@ int main()
   auto imgf_depth = reinterpret_cast<float*>(imgraw_depth.get());
   auto imgf_rgb = reinterpret_cast<float*>(imgraw_rgb.get());
 
-  auto f = fopen("./depth.raw", "rb");
+  auto f = fopen("media/depth.raw", "rb");
+
+  if (!f)
+    return 1;
+
   if (fread(imgraw_depth_.get(), 4, depth_width*depth_height, f) != depth_width*depth_height)
     return -1;
   fclose(f);
@@ -105,7 +111,11 @@ int main()
   auto rgbend = imgraw_rgb_.get() + total_size_rgb;
   auto rgbp = rgbend - (total_size_rgb/sizeof(float));
 
-  f = fopen("./rgb.raw", "rb");
+  f = fopen("media/rgb.raw", "rb");
+
+  if (!f)
+    return 2;
+
   if (fread(rgbp, 4, rgb_width*rgb_height, f) != rgb_width*rgb_height)
     return -2;
   fclose(f);
@@ -117,6 +127,14 @@ int main()
     return -3;
 
   int c = 0;
+
+  std::vector<cv::KeyPoint> image_kp;
+  cv::Mat image_desc(rgb_height, rgb_width, CV_32F);
+
+  std::vector<cv::KeyPoint> face_kp;
+  cv::Mat face_desc(cubefaces[0].cols, cubefaces[0].rows, CV_32F);
+
+  cv::Mat image_rgb_gs_(rgb_height, rgb_width, bfm_ctype);
 
   float g = 0.5f;
   while (c != 'q') {
@@ -136,41 +154,46 @@ int main()
     auto image_rgb = cv::Mat(rgb_height, rgb_width, CV_32FC3, imgf_rgb);
     auto image_th = cv::Mat(depth_height, depth_width, CV_32FC1);
 
-    for (auto &face : cubefaces) {
-    //auto &face = cubefaces[0]; {
-      constexpr auto match_method = cv::TM_CCOEFF;
+    cv::cvtColor(image_rgb, image_rgb_gs_, cv::COLOR_BGR2GRAY);
 
-      auto result_cols = image_rgb.cols - face.cols + 1;
-      auto result_rows = image_rgb.rows - face.rows + 1;
+    cv::Mat image_rgb_gs;
 
-      tmatch.create(result_rows, result_cols, CV_32FC3);
+    image_rgb_gs_.convertTo(image_rgb_gs, CV_8UC1, 255, 1);
 
-      cv::Mat tmp;
-      face.convertTo(tmp, CV_32FC3);
-      matchTemplate(image_rgb, tmp, tmatch, match_method);
-      normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
+    fmt::print("{}\n", image_rgb_gs_.channels());
+    //for (auto &face : cubefaces) {
+    auto &face = cubefaces[0]; {
+      cv::Ptr<cv::FeatureDetector> det = cv::ORB::create();
 
-      double minVal, maxVal;
-      cv::Point minLoc, maxLoc, matchLoc;
+      image_kp.clear();
+      det->detectAndCompute(image_rgb_gs, cv::noArray(), image_kp, image_desc);
 
-      minMaxLoc(tmatch, &minVal, &maxVal, &minLoc, &maxLoc, cv::Mat());
+      face_kp.clear();
+      det->detectAndCompute(face, cv::noArray(), face_kp, face_desc);
 
-      if constexpr (match_method == cv::TM_SQDIFF || match_method == cv::TM_CCORR)
-        matchLoc = minLoc;
-      else
-        matchLoc = maxLoc;
+      //image_desc.convertTo(image_desc, CV_32FC1);
+      //face_desc.convertTo(face_desc, CV_32FC1);
 
-      cv::rectangle(image_rgb, matchLoc, cv::Point(matchLoc.x + face.cols, matchLoc.y + face.rows), cv::Scalar::all(0), 2, 8, 0);
+      auto bf = cv::BFMatcher(cv::NORM_HAMMING, false);
+      std::vector<cv::DMatch> matches;
+      bf.match(image_desc, face_desc, matches);
 
-      cv::imshow(wndname3, image_rgb);
-      cv::waitKey(20);
+      //fmt::print("{}\n\n\n", image_desc);
+      fmt::print("Matches size: {}\n", matches.size());
+      for (auto m : matches)
+        fmt::print("{}", m.distance);
+      puts("\n");
+
+
+      cv::imshow(wndname3, image_rgb_gs);
+      cv::waitKey(1);
     }
 
     cv::threshold(image_depth, image_th, 0.25f, 255.0f, cv::THRESH_BINARY);
 
     cv::imshow(wndname, image_depth);
     cv::imshow(wndname2, image_th);
-    cv::imshow(wndname3, image_rgb);
+    //cv::imshow(wndname3, image_rgb);
 
     cv::waitKey(20);
     cv::waitKey(20);
