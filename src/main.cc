@@ -6,7 +6,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
+#include <opencv2/imgproc.hpp>
 #include <atomic>
 #include <fmt/format.h>
 #include <memory>
@@ -14,12 +14,21 @@
 std::atomic_flag continue_flag;
 const char *wnd_rgb = "wndrgb";
 const char *wnd_depth = "wnddepth";
+const char *wnd_diff= "wnddiff";
 
 extern "C"
 {
 #include <signal.h>
 #include <unistd.h>
 }
+constexpr int DIFF_FRAMES_COUNT = 2;
+enum frames_idx
+{
+    frame_base_image,
+    frame_with_cube,
+};
+
+std::array<cv::Mat, DIFF_FRAMES_COUNT> diff_frames;
 
 using namespace cv;
 
@@ -49,6 +58,43 @@ depth_process(libfreenect2::Frame *frame)
   {
     fp[i] /= 4500.0f;
   }
+}
+
+void save_frame(const char* fname, libfreenect2::Frame *frame)
+{
+  auto total_size = frame->height * frame->width;
+  auto fp = reinterpret_cast<float *>(frame->data);
+  auto fd = fopen(fname, "wb");
+  for (int i = 0; i < total_size; i++)
+  {
+    fwrite(reinterpret_cast<char*>(&fp[i]),4,1,fd);
+  }
+  fclose(fd);
+}
+
+void process_frame(char sign, libfreenect2::Frame *depth)
+{
+    switch(sign)
+    {
+        case 'f':
+            diff_frames[frames_idx::frame_base_image]= Mat(depth->height, depth->width, CV_32FC1, depth->data);
+            fmt::print("taking first snap");
+            break;
+        case 's':
+            diff_frames[frames_idx::frame_with_cube]= Mat(depth->height, depth->width, CV_32FC1, depth->data);
+            fmt::print("taking second snap");
+            break;
+        case 'c':
+            {
+                fmt::print("Calculating frames");
+                cv::Mat thresh;
+                auto diff_res = diff_frames[frames_idx::frame_base_image] - diff_frames[frames_idx::frame_with_cube];
+                
+                cv::threshold(diff_res,thresh, 0.3f, 1.0f, cv::THRESH_BINARY);
+                imshow(wnd_diff,thresh);
+            }
+            break;
+    }
 }
 
 int
@@ -118,7 +164,8 @@ main()
 
     depth_process(depth);
     image_depth = Mat(depth->height, depth->width, CV_32FC1, depth->data);
-
+    process_frame(sign, depth);
+    
     imshow(wnd_rgb, image_rgb);
     imshow(wnd_depth, image_depth);
 
