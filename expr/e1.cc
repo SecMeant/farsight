@@ -157,7 +157,7 @@ main()
 
   conv32FC1To8CU1(imgraw_depth_base_.get(), depth_height * depth_width);
   conv32FC1To8CU1(imgraw_depth_.get(), depth_height * depth_width);
-  cv::Ptr<cv::BackgroundSubtractor> image_subtractor = cv::createBackgroundSubtractorMOG2(1, 1000 ,true);
+  cv::Ptr<cv::BackgroundSubtractor> image_subtractor = cv::createBackgroundSubtractorMOG2(500, 2000 ,true);
   cv::Mat tmp_frame; 
   int c = 0;
   float g = 0.5f;
@@ -191,8 +191,8 @@ main()
     auto image_rgb = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb.get());
     auto image_rgb_base = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb_base.get());
     auto image_th = cv::Mat(depth_height, depth_width, CV_8UC1);
-    
-    image_subtractor->apply(image_rgb_base, tmp_frame);
+    for(int i =0 ; i <500 ; i++)
+        image_subtractor->apply(image_rgb_base, tmp_frame);
     image_subtractor->apply(image_rgb, tmp_frame);
     cv::imshow(wndname3, image_rgb);
     cv::imshow(wndname4, image_rgb_base);
