@@ -3,6 +3,8 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/video.hpp>
+
 
 #include <memory>
 #include <stdio.h>
@@ -29,22 +31,6 @@ gamma(float *data, size_t size, float gamma)
 constexpr size_t cubeface_count = 6;
 std::array<cv::Mat, cubeface_count> cubefaces;
 
-bool
-loadfaces()
-{
-  cubefaces[0] = cv::imread("media/cube_photo0.jpg", cv::IMREAD_GRAYSCALE);
-  cubefaces[1] = cv::imread("media/cube_photo1.jpg", cv::IMREAD_GRAYSCALE);
-  cubefaces[2] = cv::imread("media/cube_photo2.jpg", cv::IMREAD_GRAYSCALE);
-  cubefaces[3] = cv::imread("media/cube_photo3.jpg", cv::IMREAD_GRAYSCALE);
-  cubefaces[4] = cv::imread("media/cube_photo4.jpg", cv::IMREAD_GRAYSCALE);
-  cubefaces[5] = cv::imread("media/cube_photo5.jpg", cv::IMREAD_GRAYSCALE);
-
-  for (auto i = 0; i < cubeface_count; ++i)
-    if (!cubefaces[i].data)
-      return false;
-
-  return true;
-}
 
 void
 removeAlpha(float *data, size_t size)
@@ -70,18 +56,6 @@ conv8UC4To32FC4(byte *data, size_t size)
        ++rgbp, ++rgbfp)
   {
     *rgbfp = static_cast<float>(*rgbp) / 255.0f;
-  }
-}
-
-void diff(byte *i1_, byte *i2_, size_t size, char th = 10)
-{
-  auto i1 = reinterpret_cast<char*>(i1_);
-  auto i2 = reinterpret_cast<char*>(i2_);
-
-  for (auto i = 0; i < size; ++i)
-  {
-    if (std::abs(i1[i] - i2[i]) < th)
-      i1[i] = 255;
   }
 }
 
@@ -134,7 +108,7 @@ main()
   auto imgraw_rgb_base_ = std::make_unique<byte[]>(total_size_rgb);
   auto imgraw_rgb_base = std::make_unique<byte[]>(total_size_rgb);
 
-  auto fno = 8;
+  auto fno = 6;
 
   auto f = fopen(fmt::format("media/depth_raw{}", fno).c_str(), "rb");
 
@@ -183,15 +157,11 @@ main()
 
   conv32FC1To8CU1(imgraw_depth_base_.get(), depth_height * depth_width);
   conv32FC1To8CU1(imgraw_depth_.get(), depth_height * depth_width);
-  //removeAlpha(reinterpret_cast<float *>(imgraw_rgb_.get()),
-  //          rgb_width * rgb_height * sizeof(float));
-
-  
-  cv::Ptr<cv::SimpleBlobDetector> det = cv::SimpleBlobDetector::create();
-
+  cv::Ptr<cv::BackgroundSubtractor> image_subtractor = cv::createBackgroundSubtractorMOG2(1, 1000 ,true);
+  cv::Mat tmp_frame; 
   int c = 0;
   float g = 0.5f;
-  while (c != 'q')
+  //while (c != 'q')
   {
     if (c == '+')
       g += 0.015625f;
@@ -214,9 +184,6 @@ main()
               imgraw_rgb_base_.get() + total_size_rgb,
               imgraw_rgb_base.get());
 
-    //gamma(imgf_depth, fsize_depth, g);
-    diff(imgraw_depth.get(), imgraw_depth_base.get(), fsize_depth);
-
     auto image_depth_base =
       cv::Mat(depth_height, depth_width, CV_8UC1, imgraw_depth_base.get());
     auto image_depth =
@@ -224,23 +191,15 @@ main()
     auto image_rgb = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb.get());
     auto image_rgb_base = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb_base.get());
     auto image_th = cv::Mat(depth_height, depth_width, CV_8UC1);
-
-
-    cv::Mat image_depth_th;
-    cv::threshold(image_depth, image_depth_th, 0.8f, 1.0f, cv::THRESH_BINARY);
-
-    std::vector<cv::KeyPoint> kp;
-    det->detect(image_depth, kp);
-
-    for (auto &k : kp)
-      fmt::print("{} ", k.pt);
-    puts("");
-
-    cv::drawKeypoints(image_depth, kp, image_depth_th, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-
-    cv::imshow(wndname3, image_depth_base);
-    cv::imshow(wndname4, image_depth);
-
-    cv::waitKey(100);
+    
+    image_subtractor->apply(image_rgb_base, tmp_frame);
+    image_subtractor->apply(image_rgb, tmp_frame);
+    cv::imshow(wndname3, image_rgb);
+    cv::imshow(wndname4, image_rgb_base);
+    cv::imshow(wndname2,tmp_frame);
   }
+    cv::waitKey(0);
+    cv::waitKey(0);
+    cv::waitKey(0);
+    cv::waitKey(0);
 }
