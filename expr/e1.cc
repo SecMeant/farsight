@@ -21,6 +21,36 @@ const char *wndname4 = "wnd4";
 
 using byte = unsigned char;
 
+class Blob {
+public:
+    std::vector<cv::Point> contour;
+
+    cv::Rect boundingRect;
+
+    cv::Point centerPosition;
+
+    double dblDiagonalSize;
+
+    double dblAspectRatio;
+
+    Blob(std::vector<cv::Point> _contour) {
+  
+      contour = _contour;
+  
+      boundingRect = cv::boundingRect(contour);
+  
+      centerPosition.x = (boundingRect.x + boundingRect.x + boundingRect.width) / 2;
+      centerPosition.y = (boundingRect.y + boundingRect.y + boundingRect.height) / 2;
+  
+      dblDiagonalSize = sqrt(pow(boundingRect.width, 2) + pow(boundingRect.height, 2));
+  
+      dblAspectRatio = (float)boundingRect.width / (float)boundingRect.height;
+  
+    }
+
+};
+
+
 void
 gamma(float *data, size_t size, float gamma)
 {
@@ -108,7 +138,7 @@ main()
   auto imgraw_rgb_base_ = std::make_unique<byte[]>(total_size_rgb);
   auto imgraw_rgb_base = std::make_unique<byte[]>(total_size_rgb);
 
-  auto fno = 6;
+  auto fno = 3;
 
   auto f = fopen(fmt::format("media/depth_raw{}", fno).c_str(), "rb");
 
@@ -145,7 +175,7 @@ main()
   rgbend = imgraw_rgb_base_.get() + total_size_rgb;
   rgbp = rgbend - (total_size_rgb / sizeof(float));
 
-  f = fopen(fmt::format("media/rgb_raw5", fno).c_str(), "rb");
+  f = fopen(fmt::format("media/rgb_raw0", fno).c_str(), "rb");
 
   if (!f)
     return 2;
@@ -157,8 +187,7 @@ main()
 
   conv32FC1To8CU1(imgraw_depth_base_.get(), depth_height * depth_width);
   conv32FC1To8CU1(imgraw_depth_.get(), depth_height * depth_width);
-  cv::Ptr<cv::BackgroundSubtractor> image_subtractor = cv::createBackgroundSubtractorMOG2(500, 2000 ,true);
-  cv::Mat tmp_frame; 
+  cv::Mat tmp_frame;
   int c = 0;
   float g = 0.5f;
   //while (c != 'q')
@@ -191,12 +220,85 @@ main()
     auto image_rgb = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb.get());
     auto image_rgb_base = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb_base.get());
     auto image_th = cv::Mat(depth_height, depth_width, CV_8UC1);
-    for(int i =0 ; i <500 ; i++)
-        image_subtractor->apply(image_rgb_base, tmp_frame);
-    image_subtractor->apply(image_rgb, tmp_frame);
+    
+    const cv::Scalar SCALAR_WHITE = cv::Scalar(255.0,255.0,255.0);
+    const cv::Scalar SCALAR_BLACK = cv::Scalar(0.0, 0.0,0.0);
+    const cv::Scalar SCALAR_RED = cv::Scalar(0.0, 0.0, 255.0);
+    const cv::Scalar SCALAR_GREEN = cv::Scalar(0.0, 200.0, 0.0);
+    cv::Mat img_rgb_ = image_rgb.clone();
+    cv::Mat img_rgb_base_ = image_rgb_base.clone();
+    cv::Mat imgDifference;
+    cv::Mat imgThresh;
+
+    cv::cvtColor(img_rgb_, img_rgb_, CV_BGR2GRAY);
+    cv::cvtColor(img_rgb_base_, img_rgb_base_, CV_BGR2GRAY);
+
+    cv::GaussianBlur(img_rgb_,img_rgb_, cv::Size(5, 5), 0);
+    cv::GaussianBlur(img_rgb_base_, img_rgb_base_, cv::Size(5, 5), 0);
+
+    cv::absdiff(img_rgb_,img_rgb_base_, imgDifference);
+
+    cv::threshold(imgDifference, imgThresh, 70, 255.0, CV_THRESH_BINARY);
+    cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::dilate(imgThresh, imgThresh, structuringElement5x5);
+    cv::dilate(imgThresh, imgThresh, structuringElement5x5);
+    cv::erode(imgThresh, imgThresh, structuringElement5x5);
+    
+    cv::Mat imgThreshCopy = imgThresh.clone();
+    std::vector<std::vector<cv::Point> > contours;
+
+    cv::findContours(imgThreshCopy, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    cv::Mat imgContours(imgThresh.size(), CV_8UC3, SCALAR_BLACK);
+
+    cv::drawContours(imgContours, contours, -1, SCALAR_WHITE, -1);
+
+    cv::imshow("imgContours", imgContours);
+
+    std::vector<std::vector<cv::Point> > convexHulls(contours.size());
+
+    for (unsigned int i = 0; i < contours.size(); i++) {
+        cv::convexHull(contours[i], convexHulls[i]);
+    }
+
+    std::vector<Blob> blobs;
+    for (auto &convexHull : convexHulls) {
+            Blob possibleBlob(convexHull);
+
+            if (possibleBlob.boundingRect.area() > 100 &&
+                possibleBlob.dblAspectRatio >= 0.2 &&
+                possibleBlob.dblAspectRatio <= 1.2 &&
+                possibleBlob.boundingRect.width > 15 &&
+                possibleBlob.boundingRect.height > 20 &&
+                possibleBlob.dblDiagonalSize > 30.0) {
+                blobs.push_back(possibleBlob);
+            }
+        }
+
+
+    convexHulls.clear();
+
+    for (auto &blob : blobs) {
+            convexHulls.push_back(blob.contour);
+    }
+    
+    cv::Mat imgConvexHulls(imgThresh.size(), CV_8UC3, SCALAR_BLACK);
+    cv::drawContours(imgConvexHulls, convexHulls, -1, SCALAR_WHITE, -1);
+    
+    cv::imshow("imgConvexHulls", imgConvexHulls);
+
+    img_rgb_ = img_rgb_.clone();          // get another copy of frame 2 since we changed the previous frame 2 copy in the processing above
+
+        for (auto &blob : blobs) {                                                  // for each blob
+            cv::rectangle(img_rgb_, blob.boundingRect, SCALAR_RED, 2);             // draw a red box around the blob
+            cv::circle(img_rgb_, blob.centerPosition, 3, SCALAR_GREEN, -1);        // draw a filled-in green circle at the center
+        }
+
+        cv::imshow("img_rgb_",img_rgb_);
+
+    
     cv::imshow(wndname3, image_rgb);
     cv::imshow(wndname4, image_rgb_base);
-    cv::imshow(wndname2,tmp_frame);
   }
     cv::waitKey(0);
     cv::waitKey(0);
