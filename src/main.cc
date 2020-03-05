@@ -145,7 +145,7 @@ main()
 
   Mat image_rgb, image_depth;
   char sign = '\0';
-
+  int num =0;
   while (continue_flag.test_and_set())
   {
 
@@ -168,7 +168,15 @@ main()
     
     imshow(wnd_rgb, image_rgb);
     imshow(wnd_depth, image_depth);
+    auto dfr = fopen(fmt::format("rgb_raw{}",num).c_str(),"wb");
+    auto ddd = fopen(fmt::format("depth_raw{}",num).c_str(),"wb");
+    fwrite(rgb->data, rgb->width*rgb->height,rgb->bytes_per_pixel, dfr);
 
+    fwrite(depth->data, depth->width*depth->height,depth->bytes_per_pixel, ddd);
+    fclose(dfr);
+    fclose(ddd);
+    num++;
+    getchar();
     sign = waitKey(1);
 
     listener.release(frames);
