@@ -3,6 +3,7 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/photo.hpp>
 
 #include <memory>
 #include <stdio.h>
@@ -112,7 +113,7 @@ void conv32FC1To8CU1(byte *data, size_t size)
 constexpr auto bfm_ctype = CV_8UC1;
 
 int
-main()
+main(int argc, char **argv)
 {
   size_t depth_width = 512, depth_height = 424;
   size_t fsize_depth = depth_width * depth_height;
@@ -134,7 +135,7 @@ main()
   auto imgraw_rgb_base_ = std::make_unique<byte[]>(total_size_rgb);
   auto imgraw_rgb_base = std::make_unique<byte[]>(total_size_rgb);
 
-  auto fno = 8;
+  auto fno = argc >= 2 ? atoi(argv[1]) : 2;
 
   auto f = fopen(fmt::format("media/depth_raw{}", fno).c_str(), "rb");
 
@@ -146,7 +147,7 @@ main()
     return -1;
   fclose(f);
 
-  f = fopen("media/depth_raw5", "rb");
+  f = fopen(fmt::format("media/depth_raw{}", fno > 5 ? 5 : 0).c_str(), "rb");
 
   if (!f)
     return 1;
@@ -186,11 +187,30 @@ main()
   //removeAlpha(reinterpret_cast<float *>(imgraw_rgb_.get()),
   //          rgb_width * rgb_height * sizeof(float));
 
-  
-  cv::Ptr<cv::SimpleBlobDetector> det = cv::SimpleBlobDetector::create();
+
+  cv::SimpleBlobDetector::Params params;
+
+  params.filterByArea = true;
+  params.minArea = 5;
+  params.maxArea = std::numeric_limits<float>::infinity();
+
+  cv::Ptr<cv::SimpleBlobDetector> det = cv::SimpleBlobDetector::create(params);
 
   int c = 0;
   float g = 0.5f;
+
+  int connectivity = 4, itype = CV_16U, ccltype = cv::CCL_WU;
+  int lowerb = 0, higherb = 255;
+  int lowerb2 = 20, higherb2 = 240;
+  int area = 0;
+  bool clr = false;
+  int p = 0;
+  //cv::namedWindow(wndname, cv::WINDOW_AUTOSIZE);
+  //cv::createTrackbar("lowerb", wndname, &lowerb, 255);
+  //cv::createTrackbar("higherb", wndname, &higherb, 255);
+  //cv::createTrackbar("lowerb2", wndname, &lowerb2, 255);
+  //cv::createTrackbar("higherb2", wndname, &higherb2, 255);
+  //cv::createTrackbar("print", wndname, &p, 1);
   while (c != 'q')
   {
     if (c == '+')
@@ -226,21 +246,58 @@ main()
     auto image_th = cv::Mat(depth_height, depth_width, CV_8UC1);
 
 
-    cv::Mat image_depth_th;
-    cv::threshold(image_depth, image_depth_th, 0.8f, 1.0f, cv::THRESH_BINARY);
+    cv::Mat image_depth_th, image_depth_filtered;
+    cv::threshold(image_depth, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
+    cv::inRange(image_depth, lowerb2, higherb2, image_depth_filtered);
 
-    std::vector<cv::KeyPoint> kp;
-    det->detect(image_depth, kp);
+    cv::Mat labels, stats, centroids;
+    cv::connectedComponentsWithStats(image_depth_filtered, labels, stats, centroids);
 
-    for (auto &k : kp)
-      fmt::print("{} ", k.pt);
-    puts("");
+    clr = !clr;
 
-    cv::drawKeypoints(image_depth, kp, image_depth_th, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    struct bbox
+    {
+      int x, y, w, h, area;
+    }best_bbox;
 
-    cv::imshow(wndname3, image_depth_base);
-    cv::imshow(wndname4, image_depth);
+    int barea = 0;
+    for (int i = 0; i < stats.rows; ++i)
+    {
+      int x = stats.at<int>({0,i});
+      int y = stats.at<int>({1,i});
+      int w = stats.at<int>({2,i});
+      int h = stats.at<int>({3,i});
+      int area = stats.at<int>({4,i});
 
-    cv::waitKey(100);
+      if (area >= depth_width * depth_height / 2)
+        continue;
+
+      if (area > best_bbox.area) {
+        best_bbox.area = area;
+        best_bbox.x = x;
+        best_bbox.y = y;
+        best_bbox.w = w;
+        best_bbox.h = h;
+      }
+    }
+
+    fmt::print("Area: {}\n", best_bbox.area);
+    cv::Scalar color(clr ? 255 : 0, 0, 0);
+    cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
+    cv::rectangle(image_depth, rect, color, 3);
+    //std::vector<cv::KeyPoint> kp;
+    //det->detect(image_depth, kp);
+
+    //for (auto &k : kp)
+    //  fmt::print("{} ", k.pt);
+    //puts("");
+
+    //cv::drawKeypoints(image_depth_th, kp, image_depth_th, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    p = 0;
+
+    cv::imshow(wndname3, image_depth);
+    //cv::imshow(wndname2, image_depth_filtered);
+
+    c = cv::waitKey(100);
   }
 }
