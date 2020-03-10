@@ -229,7 +229,21 @@ main()
     cv::Mat img_rgb_base_ = image_rgb_base.clone();
     cv::Mat imgDifference;
     cv::Mat imgThresh;
-
+    double alpha = 0.85; /*< Simple contrast control */
+    int beta = 0;       /*< Simple brightness control */
+    fmt::print("{} {} {}", img_rgb_.rows, img_rgb_.cols, img_rgb_.channels());
+    for( int y = 0; y < img_rgb_.rows; y++ ) {
+        for( int x = 0; x < img_rgb_.cols; x++ ) {
+            for( int c = 0; c < img_rgb_.channels(); c++ ) {
+                img_rgb_.at<cv::Vec4b>(y,x)[c] =
+                  cv::saturate_cast<uchar>( powf(img_rgb_.at<cv::Vec4b>(y,x)[c],alpha) + beta );
+                img_rgb_base_.at<cv::Vec4b>(y,x)[c] =
+                  cv::saturate_cast<uchar>( powf(img_rgb_base_.at<cv::Vec4b>(y,x)[c],alpha) + beta );
+            }
+        }
+    }
+    cv::imshow("Contrast added", img_rgb_);
+    cv::imshow("Contrast added2", img_rgb_base_);
     cv::cvtColor(img_rgb_, img_rgb_, CV_BGR2GRAY);
     cv::cvtColor(img_rgb_base_, img_rgb_base_, CV_BGR2GRAY);
 
@@ -238,10 +252,12 @@ main()
 
     cv::absdiff(img_rgb_,img_rgb_base_, imgDifference);
 
-    cv::threshold(imgDifference, imgThresh, 70, 255.0, CV_THRESH_BINARY);
-    cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::threshold(imgDifference, imgThresh, 40, 255.0, CV_THRESH_BINARY);
+    cv::imshow("imgThresh", imgThresh);
+    cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7, 7));
     cv::dilate(imgThresh, imgThresh, structuringElement5x5);
     cv::dilate(imgThresh, imgThresh, structuringElement5x5);
+    cv::erode(imgThresh, imgThresh, structuringElement5x5);
     cv::erode(imgThresh, imgThresh, structuringElement5x5);
     
     cv::Mat imgThreshCopy = imgThresh.clone();
