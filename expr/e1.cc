@@ -4,7 +4,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/video.hpp>
-
+#include<opencv2/ximgproc/segmentation.hpp>
 
 #include <memory>
 #include <stdio.h>
@@ -13,6 +13,7 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+using namespace cv::ximgproc::segmentation;
 
 const char *wndname = "wnd";
 const char *wndname2 = "wnd2";
@@ -157,7 +158,6 @@ main()
 
   conv32FC1To8CU1(imgraw_depth_base_.get(), depth_height * depth_width);
   conv32FC1To8CU1(imgraw_depth_.get(), depth_height * depth_width);
-  cv::Ptr<cv::BackgroundSubtractor> image_subtractor = cv::createBackgroundSubtractorMOG2(500, 2000 ,true);
   cv::Mat tmp_frame; 
   int c = 0;
   float g = 0.5f;
@@ -191,12 +191,25 @@ main()
     auto image_rgb = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb.get());
     auto image_rgb_base = cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb_base.get());
     auto image_th = cv::Mat(depth_height, depth_width, CV_8UC1);
-    for(int i =0 ; i <500 ; i++)
-        image_subtractor->apply(image_rgb_base, tmp_frame);
-    image_subtractor->apply(image_rgb, tmp_frame);
+    cv::setUseOptimized(true);
+    cv::setNumThreads(12);
+    //int newHeight = 200;
+    //int newWidth = image_rgb.cols*newHeight/image_rgb.rows;
+    //resize(image_rgb, image_rgb, cv::Size(newWidth, newHeight));
+    cv::cvtColor(image_rgb, image_rgb, CV_BGRA2BGR);
+    cv::cvtColor(image_rgb_base, image_rgb_base, CV_BGRA2BGR);
+    cv::Ptr<SelectiveSearchSegmentation> ss = createSelectiveSearchSegmentation();
+    ss->setBaseImage(image_rgb);
+    ss->switchToSelectiveSearchFast();
+    std::vector<cv::Rect> rects;
+    ss->process(rects);
+    for(int i =0; i< rects.size(); i++)
+    {
+        cv::rectangle(image_rgb, rects[i],cv::Scalar(0,255,0));
+    }
     cv::imshow(wndname3, image_rgb);
     cv::imshow(wndname4, image_rgb_base);
-    cv::imshow(wndname2,tmp_frame);
+//    cv::imshow(wndname2,tmp_frame);
   }
     cv::waitKey(0);
     cv::waitKey(0);
