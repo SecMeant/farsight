@@ -1,25 +1,43 @@
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/features2d.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/photo.hpp>
+
 #include <libfreenect2/frame_listener_impl.h>
 #include <libfreenect2/libfreenect2.hpp>
 #include <libfreenect2/logger.h>
 #include <libfreenect2/packet_pipeline.h>
 #include <libfreenect2/registration.h>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-
-#include <atomic>
-#include <fmt/format.h>
 #include <memory>
+#include <stdio.h>
 
-std::atomic_flag continue_flag;
-const char *wnd_rgb = "wndrgb";
-const char *wnd_depth = "wnddepth";
+#include <cmath>
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include "image_proc.hpp"
 
 extern "C"
 {
 #include <signal.h>
 #include <unistd.h>
 }
+
+const char *wndname = "wnd";
+const char *wndname2 = "wnd2";
+const char *wndname3 = "wnd3";
+const char *wndname4 = "wnd4";
+
+std::atomic_flag continue_flag;
+libfreenect2::SyncMultiFrameListener listener(
+  libfreenect2::Frame::Color | libfreenect2::Frame::Ir |
+  libfreenect2::Frame::Depth);
+libfreenect2::FrameMap frames;
+libfreenect2::Freenect2Device *dev;
+libfreenect2::Freenect2 freenect2;
 
 using namespace cv;
 
@@ -35,42 +53,13 @@ sigint_handler(int signo)
   }
 }
 
-void
-rgb_process(libfreenect2::Frame *frame)
-{}
-
-void
-depth_process(libfreenect2::Frame *frame)
+void libfreenectInit()
 {
-  auto total_size = frame->height * frame->width;
-  auto fp = reinterpret_cast<float *>(frame->data);
-
-  for (int i = 0; i < total_size; i++)
-  {
-    fp[i] /= 4500.0f;
-  }
-}
-
-int
-main()
-{
-  continue_flag.test_and_set();
-
-  namedWindow(wnd_rgb, WINDOW_AUTOSIZE);
-  namedWindow(wnd_depth, WINDOW_AUTOSIZE);
-
-  if (signal(SIGINT, sigint_handler) == SIG_ERR)
-  {
-    fmt::print("Failed to register signal handler.\n");
-    return -2;
-  }
-
-  libfreenect2::Freenect2 freenect2;
 
   if (freenect2.enumerateDevices() == 0)
   {
     fmt::print("No devices connected\n");
-    return -1;
+    exit(-1);
   }
 
   std::string serial = freenect2.getDefaultDeviceSerialNumber();
@@ -78,57 +67,121 @@ main()
   fmt::print("Connecting to the device with serial: {}\n", serial);
 
   auto pipeline = new libfreenect2::OpenGLPacketPipeline;
-  auto dev = freenect2.openDevice(serial, pipeline);
-
-  libfreenect2::SyncMultiFrameListener listener(
-    libfreenect2::Frame::Color | libfreenect2::Frame::Ir |
-    libfreenect2::Frame::Depth);
-  libfreenect2::FrameMap frames;
+  dev = freenect2.openDevice(serial, pipeline);
 
   dev->setColorFrameListener(&listener);
   dev->setIrAndDepthFrameListener(&listener);
 
   if (!dev->start())
-    return -1;
+    exit(-1);
 
   fmt::print("Connecting to the device\n"
              "Device serial number	: {}\n"
              "Device firmware	: {}\n",
              dev->getSerialNumber(),
              dev->getFirmwareVersion());
+}
 
-  Mat image_rgb, image_depth;
-  char sign = '\0';
+int
+main(int argc, char **argv)
+{
+  continue_flag.test_and_set();
+  if (signal(SIGINT, sigint_handler) == SIG_ERR)
+  {
+    fmt::print("Failed to register signal handler.\n");
+    exit(-2);
+  }
+ 
+  libfreenectInit();
+
+  size_t depth_width = 512, depth_height = 424;
+  size_t rgb_width = 1920, rgb_height = 1080;
+
+  cv::SimpleBlobDetector::Params params;
+  params.filterByArea = true;
+  params.minArea = 5;
+  params.maxArea = std::numeric_limits<float>::infinity();
+
+  cv::Ptr<cv::SimpleBlobDetector> det = cv::SimpleBlobDetector::create(params);
+
+  int c = 0;
+  int lowerb = 0, higherb = 255;
+  int lowerb2 = 20, higherb2 = 240;
+  int area = 0;
+  bool clr = false;
 
   while (continue_flag.test_and_set())
   {
-
     if (!listener.waitForNewFrame(frames, 10 * 1000))
     {
       fmt::print("TIMEDOUT !\n");
-      return -1;
+      exit(-1);
     }
 
     libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
     libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
 
-    rgb_process(rgb);
-    image_rgb = Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
 
-    depth_process(depth);
-    image_depth = Mat(depth->height, depth->width, CV_32FC1, depth->data);
+    depthProcess(depth);
+    
+    conv32FC1To8CU1(depth->data , depth->height* depth->width);
+    //conv32FC1To8CU1(imgraw_depth_.get(), depth_height * depth_width);
+ 
+    diff(depth->data, depth->data, depth->height* depth->width);
 
-    imshow(wnd_rgb, image_rgb);
-    imshow(wnd_depth, image_depth);
+    auto image_depth_base =
+      cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
+    auto image_depth =
+      cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
+    auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
 
-    sign = waitKey(1);
+    cv::Mat image_depth_th, image_depth_filtered;
+    cv::threshold(image_depth, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
+    cv::inRange(image_depth, lowerb2, higherb2, image_depth_filtered);
 
+    cv::Mat labels, stats, centroids;
+    cv::connectedComponentsWithStats(image_depth_filtered, labels, stats, centroids);
+
+    clr = !clr;
+
+    struct bbox
+    {
+      int x, y, w, h, area;
+    }best_bbox;
+
+    int barea = 0;
+    for (int i = 0; i < stats.rows; ++i)
+    {
+      int x = stats.at<int>({0,i});
+      int y = stats.at<int>({1,i});
+      int w = stats.at<int>({2,i});
+      int h = stats.at<int>({3,i});
+      int area = stats.at<int>({4,i});
+
+      if (area >= depth_width * depth_height / 2)
+        continue;
+
+      if (area > best_bbox.area) {
+        best_bbox.area = area;
+        best_bbox.x = x;
+        best_bbox.y = y;
+        best_bbox.w = w;
+        best_bbox.h = h;
+      }
+    }
+
+    fmt::print("Area: {}\n", best_bbox.area);
+    cv::Scalar color(clr ? 255 : 0, 0, 0);
+    cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
+    cv::rectangle(image_depth, rect, color, 3);
+
+    cv::imshow(wndname3, image_depth_base);
+    cv::imshow(wndname, image_rgb);
+    cv::imshow(wndname2, image_depth);
+    c = cv::waitKey(100);
     listener.release(frames);
   }
-
   dev->stop();
   dev->close();
-
-  return 0;
 }
