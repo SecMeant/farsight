@@ -25,7 +25,11 @@ extern "C"
 #include <signal.h>
 #include <unistd.h>
 }
-
+enum depth_type
+{
+    BASE,
+    WITH_OBJECT,
+};
 const char *wndname = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
@@ -94,9 +98,9 @@ main(int argc, char **argv)
  
   libfreenectInit();
 
-  size_t depth_width = 512, depth_height = 424;
-  size_t rgb_width = 1920, rgb_height = 1080;
-
+  const size_t depth_width = 512, depth_height = 424;
+  const size_t total_size_depth = depth_width*depth_height;
+  const size_t rgb_width = 1920, rgb_height = 1080;
   cv::SimpleBlobDetector::Params params;
   params.filterByArea = true;
   params.minArea = 5;
@@ -110,6 +114,8 @@ main(int argc, char **argv)
   int area = 0;
   bool clr = false;
 
+  std::array<byte, depth_width*depth_height> frame_depth_[2];
+
   while (continue_flag.test_and_set())
   {
     if (!listener.waitForNewFrame(frames, 10 * 1000))
@@ -122,16 +128,40 @@ main(int argc, char **argv)
     libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
 
-
     depthProcess(depth);
     
     conv32FC1To8CU1(depth->data , depth->height* depth->width);
-    //conv32FC1To8CU1(imgraw_depth_.get(), depth_height * depth_width);
  
-    diff(depth->data, depth->data, depth->height* depth->width);
-
-    auto image_depth_base =
-      cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
+    switch(c)
+    {
+        case 'f':
+            {
+              fmt::print("Copying first frame... \n");
+              std::copy(depth->data,
+                        depth->data + total_size_depth,
+                        frame_depth_[BASE].data());
+              auto preview=
+                cv::Mat(depth->height, depth->width, CV_8UC1, frame_depth_[BASE].data());
+              cv::imshow("Preview", preview);
+            }
+        break;
+        case 's':
+            {
+              fmt::print("Copying second dframe... \n");
+              std::copy(depth->data,
+                        depth->data + total_size_depth,
+                        frame_depth_[WITH_OBJECT].data());
+              auto preview=
+                cv::Mat(depth->height, depth->width, CV_8UC1, frame_depth_[WITH_OBJECT].data());
+              cv::imshow("Preview", preview);
+            }
+        break;
+        case 'p':
+            fmt::print("lookingfor object");
+            diff(frame_depth_[WITH_OBJECT].data(), frame_depth_[BASE].data(), depth->height* depth->width);
+        break;
+    }
+    c =0;
     auto image_depth =
       cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
     auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
@@ -176,7 +206,6 @@ main(int argc, char **argv)
     cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
     cv::rectangle(image_depth, rect, color, 3);
 
-    cv::imshow(wndname3, image_depth_base);
     cv::imshow(wndname, image_rgb);
     cv::imshow(wndname2, image_depth);
     c = cv::waitKey(100);

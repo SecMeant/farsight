@@ -17,13 +17,3 @@ depthProcess(libfreenect2::Frame *frame)
   }
 }
 
-cv::Mat frameDepthToMat(libfreenect2::Frame *frame)
-{
-
-}
-
-cv::Mat frameRgbToMat(libfreenect2::Frame *frame)
-{
-
-}
-
