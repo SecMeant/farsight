@@ -5,5 +5,5 @@
 
 void rgbProcess(libfreenect2::Frame *frame);
 void depthProcess(libfreenect2::Frame *frame);
-void detectObject(cv::Mat&);
+void detectObject(byte*, byte*,size_t,cv::Mat&);
 
