@@ -28,16 +28,17 @@ void detectObject(byte* frame_base, byte *frame_object, size_t size, cv::Mat &im
   cv::Ptr<cv::SimpleBlobDetector> det = cv::SimpleBlobDetector::create(params);
 
   const size_t depth_width = 512, depth_height = 424;
-  int c = 0;
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
   int area = 0;
   bool clr = false;
 
   diff(frame_object, frame_base, size);
+  auto image_depth_ =
+    cv::Mat(depth_height, depth_width, CV_8UC1,frame_object);
   cv::Mat image_depth_th, image_depth_filtered;
-  cv::threshold(image_depth, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
-  cv::inRange(image_depth, lowerb2, higherb2, image_depth_filtered);
+  cv::threshold(image_depth_, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
+  cv::inRange(image_depth_, lowerb2, higherb2, image_depth_filtered);
   
   cv::Mat labels, stats, centroids;
   cv::connectedComponentsWithStats(image_depth_filtered, labels, stats, centroids);
