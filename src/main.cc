@@ -126,7 +126,7 @@ main(int argc, char **argv)
     
     switch(c)
     {
-        case 'f':
+        case 'b':
             {
               fmt::print("Copying first frame... \n");
               std::copy(depth->data,
@@ -137,23 +137,19 @@ main(int argc, char **argv)
               cv::imshow("Preview", preview);
             }
         break;
-        case 's':
+        case 'p':
             {
               fmt::print("Copying second dframe... \n");
               std::copy(depth->data,
                         depth->data + total_size_depth,
                         frame_depth_[WITH_OBJECT].data());
-              auto preview=
-                cv::Mat(depth->height, depth->width, CV_8UC1, frame_depth_[WITH_OBJECT].data());
-              cv::imshow("Preview", preview);
+
+              fmt::print("looking for object...");
+              detectObject(frame_depth_[BASE].data(),
+                          frame_depth_[WITH_OBJECT].data(),
+                          total_size_depth,
+                          image_depth);
             }
-        break;
-        case 'p':
-            fmt::print("lookingfor object");
-            detectObject(frame_depth_[BASE].data(),
-                         frame_depth_[WITH_OBJECT].data(),
-                         total_size_depth,
-                         image_depth);
         break;
     }
     c =0;
