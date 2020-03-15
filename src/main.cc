@@ -103,7 +103,7 @@ main(int argc, char **argv)
   const size_t rgb_width = 1920, rgb_height = 1080;
   int c = 0;
   std::array<byte, depth_width*depth_height> frame_depth_[2];
-
+  detector dec;
   while (continue_flag.test_and_set())
   {
     if (!listener.waitForNewFrame(frames, 10 * 1000))
@@ -145,7 +145,7 @@ main(int argc, char **argv)
                         frame_depth_[WITH_OBJECT].data());
 
               fmt::print("looking for object...");
-              detectObject(frame_depth_[BASE].data(),
+              dec.detect(frame_depth_[BASE].data(),
                           frame_depth_[WITH_OBJECT].data(),
                           total_size_depth,
                           image_depth);

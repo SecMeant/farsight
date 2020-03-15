@@ -1,23 +1,7 @@
 #include "image_proc.hpp"
 #include <fmt/format.h>
 
-void
-rgbProcess(libfreenect2::Frame *frame)
-{}
-
-void
-depthProcess(libfreenect2::Frame *frame)
-{
-  auto total_size = frame->height * frame->width;
-  auto fp = reinterpret_cast<float *>(frame->data);
-
-  for (int i = 0; i < total_size; i++)
-  {
-    fp[i] /= 4500.0f;
-  }
-}
-
-void detectObject(byte* frame_base, byte *frame_object, size_t size, cv::Mat &image_depth)
+detector::detector()
 {
 
   cv::SimpleBlobDetector::Params params;
@@ -25,17 +9,17 @@ void detectObject(byte* frame_base, byte *frame_object, size_t size, cv::Mat &im
   params.minArea = 5;
   params.maxArea = std::numeric_limits<float>::infinity();
 
-  cv::Ptr<cv::SimpleBlobDetector> det = cv::SimpleBlobDetector::create(params);
-
-  const size_t depth_width = 512, depth_height = 424;
+  det = cv::SimpleBlobDetector::create(params);
+}
+void detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat &image_depth)
+{
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
-  int area = 0;
   bool clr = false;
 
   diff(frame_object, frame_base, size);
   auto image_depth_ =
-    cv::Mat(depth_height, depth_width, CV_8UC1,frame_object);
+    cv::Mat(depth_height, depth_width, CV_8UC1, frame_object);
   cv::Mat image_depth_th, image_depth_filtered;
   cv::threshold(image_depth_, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
   cv::inRange(image_depth_, lowerb2, higherb2, image_depth_filtered);
