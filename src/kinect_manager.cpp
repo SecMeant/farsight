@@ -1,6 +1,12 @@
 #include "kinect_manager.hpp"
 #include <fmt/format.h>
 
+kinect::kinect()
+ : listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth)
+{
+    this->open(0);
+}
+
 kinect::kinect(int d_idx)
  : listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth)
 {
@@ -11,6 +17,7 @@ void kinect::open(int d_idx)
 {
     if( isActive)
     {
+        this->releaseFrames();
         this->close();
     }
     isActive = true;
@@ -45,7 +52,7 @@ void kinect::open(int d_idx)
 
 void kinect::waitForFrames(int sec)
 {
-    if (!listener.waitForNewFrame(frames, 10 * 1000))
+    if (!listener.waitForNewFrame(frames, sec * 1000))
     {
       fmt::print("TIMEDOUT !\n");
       exit(-1);

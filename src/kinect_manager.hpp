@@ -7,7 +7,7 @@
 
 struct kinect
 {
-    kinect() =delete;
+    kinect();
     kinect(int d_idx);
     ~kinect();
     void open(int d_idx);

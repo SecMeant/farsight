@@ -97,9 +97,15 @@ main(int argc, char **argv)
                           image_depth);
             }
         break;
+        case '1':
+            k_dev.open(0);
+        break;
+        case '2':
+            k_dev.open(1);
+        break;
+
     }
     c =0;
-
     cv::imshow(wndname, image_rgb);
     cv::imshow(wndname2, image_depth);
     c = cv::waitKey(100);
