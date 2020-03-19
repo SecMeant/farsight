@@ -34,6 +34,8 @@ class detector
    cv::Mat o_cropped;
    std::array<objectConfig, maxKinectCount> sceneConfiguration;
    std::array<objectConfig, maxKinectCount> meassuredObjects;
+   cv::Mat configScreen;
+   cv::Rect matRoi;
 };
 
 

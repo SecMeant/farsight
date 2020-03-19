@@ -10,6 +10,8 @@ detector::detector()
   params.maxArea = std::numeric_limits<float>::infinity();
 
   det = cv::SimpleBlobDetector::create(params);
+  configScreen =cv::Mat::zeros(cv::Size(depth_width*2 +10, depth_height*2+10), CV_8UC1);
+
 }
 detector::bbox detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat &image_depth)
 {
@@ -72,6 +74,38 @@ void detector::setBaseImg(int kinectID, cv::Mat &img)
 
 void detector::displayCurrectConfig()
 {
+    const auto & c1 = sceneConfiguration[0];
+    const auto & c2 = sceneConfiguration[1];
+    cv::Mat temp; 
+
+    if(c1.imBaseSet == true)
+    {
+        matRoi =cv::Rect(0, 0, depth_width, depth_height);
+        resize(c1.img_base, temp, cv::Size(depth_width, depth_height));
+        temp.copyTo(configScreen(matRoi));
+    }
+    
+    if(c1.imObjectSet== true)
+    {
+        matRoi =cv::Rect(depth_width, 0, depth_width,depth_height);
+        resize(c1.img_object, temp, cv::Size(depth_width,depth_height));
+        temp.copyTo(configScreen(matRoi));
+    }
+
+    if(c2.imBaseSet == true)
+    {
+        matRoi =cv::Rect(0, depth_height, depth_width, depth_height);
+        resize(c2.img_base, temp, cv::Size(depth_width, depth_height));
+        temp.copyTo(configScreen(matRoi));
+    }
+    
+    if(c2.imObjectSet== true)
+    {
+        matRoi =cv::Rect(depth_width, depth_height, depth_width,depth_height);
+        resize(c2.img_object, temp, cv::Size(depth_width,depth_height));
+        temp.copyTo(configScreen(matRoi));
+    }
+    cv::imshow("Dupa", configScreen); 
 }
 
 void detector::presentResults()

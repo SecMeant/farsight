@@ -83,6 +83,7 @@ main(int argc, char **argv)
               auto base_img=
                 cv::Mat(depth->height, depth->width, CV_8UC1, frame_depth_[BASE].data());
               dec.setBaseImg(selectedKinnect, base_img);
+              dec.displayCurrectConfig();
             }
         break;
         case 'c':
@@ -97,6 +98,7 @@ main(int argc, char **argv)
                           total_size_depth,
                           image_depth);
               dec.configure(selectedKinnect, image_depth, detectedBox);
+              dec.displayCurrectConfig();
             }
         break;
         case '1':
@@ -111,7 +113,6 @@ main(int argc, char **argv)
     }
     cv::imshow(wndname, image_rgb);
     cv::imshow(wndname2, image_depth);
-    dec.displayCurrectConfig();
     c = cv::waitKey(100);
     k_dev.releaseFrames();
   }
