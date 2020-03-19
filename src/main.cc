@@ -50,12 +50,14 @@ main(int argc, char **argv)
   const size_t total_size_depth = depth_width*depth_height;
   const size_t rgb_width = 1920, rgb_height = 1080;
   int c = 0;
- 
+  
+  int selectedKinnect =0;
+
   std::array<byte, depth_width*depth_height> frame_depth_[2];
   detector dec;
-  kinect k_dev(1);
+  kinect k_dev(selectedKinnect);
 
-  while (continue_flag.test_and_set())
+  while (continue_flag.test_and_set() and c != 'q')
   {
     k_dev.waitForFrames(10);
     libfreenect2::Frame *rgb   = k_dev.frames[libfreenect2::Frame::Color];
@@ -74,40 +76,42 @@ main(int argc, char **argv)
     {
         case 'b':
             {
-              fmt::print("Copying first frame... \n");
+              fmt::print("Setting {} kinect base image \n",selectedKinnect+1);
               std::copy(depth->data,
                         depth->data + total_size_depth,
                         frame_depth_[BASE].data());
-              auto preview=
+              auto base_img=
                 cv::Mat(depth->height, depth->width, CV_8UC1, frame_depth_[BASE].data());
-              cv::imshow("Preview", preview);
+              dec.setBaseImg(selectedKinnect, base_img);
             }
         break;
-        case 'p':
+        case 'c':
             {
-              fmt::print("Copying second dframe... \n");
+              fmt::print("Making {} kamera configuration \n",selectedKinnect+1);
               std::copy(depth->data,
                         depth->data + total_size_depth,
                         frame_depth_[WITH_OBJECT].data());
 
-              fmt::print("looking for object...");
-              dec.detect(frame_depth_[BASE].data(),
+              auto detectedBox = dec.detect(frame_depth_[BASE].data(),
                           frame_depth_[WITH_OBJECT].data(),
                           total_size_depth,
                           image_depth);
+              dec.configure(selectedKinnect, image_depth, detectedBox);
             }
         break;
         case '1':
-            k_dev.open(0);
+            selectedKinnect = 0;
+            k_dev.open(selectedKinnect);
         break;
         case '2':
-            k_dev.open(1);
+            selectedKinnect = 1;
+            k_dev.open(selectedKinnect);
         break;
 
     }
-    c =0;
     cv::imshow(wndname, image_rgb);
     cv::imshow(wndname2, image_depth);
+    dec.displayCurrectConfig();
     c = cv::waitKey(100);
     k_dev.releaseFrames();
   }

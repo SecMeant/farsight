@@ -11,7 +11,7 @@ detector::detector()
 
   det = cv::SimpleBlobDetector::create(params);
 }
-void detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat &image_depth)
+detector::bbox detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat &image_depth)
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
@@ -28,13 +28,8 @@ void detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat
   cv::connectedComponentsWithStats(image_depth_filtered, labels, stats, centroids);
   
   clr = !clr;
-  
-  struct bbox
-  {
-    int x, y, w, h, area;
-  }best_bbox;
-  
-  int barea = 0;
+  bbox best_bbox;
+
   for (int i = 0; i < stats.rows; ++i)
   {
     int x = stats.at<int>({0,i});
@@ -59,4 +54,27 @@ void detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat
   cv::Scalar color(clr ? 255 : 0, 0, 0);
   cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
   cv::rectangle(image_depth, rect, color, 3);
+  return best_bbox;
+}
+
+void detector::configure(int kinectID, cv::Mat &img, bbox &sizes)
+{
+    img.copyTo(sceneConfiguration[kinectID].img_object);
+    sceneConfiguration[kinectID].area = sizes;
+    sceneConfiguration[kinectID].imObjectSet= true;
+}
+
+void detector::setBaseImg(int kinectID, cv::Mat &img)
+{
+    img.copyTo(sceneConfiguration[kinectID].img_base);
+    sceneConfiguration[kinectID].imBaseSet= true;
+}
+
+void detector::displayCurrectConfig()
+{
+}
+
+void detector::presentResults()
+{
+
 }
