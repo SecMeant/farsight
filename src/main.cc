@@ -88,7 +88,7 @@ main(int argc, char **argv)
         break;
         case 'c':
             {
-              fmt::print("Making {} kamera configuration \n",selectedKinnect+1);
+              fmt::print("Making {} kinect configuration \n",selectedKinnect+1);
               std::copy(depth->data,
                         depth->data + total_size_depth,
                         frame_depth_[WITH_OBJECT].data());
@@ -110,6 +110,10 @@ main(int argc, char **argv)
             k_dev.open(selectedKinnect);
         break;
 
+    }
+    if(dec.isFullyConfigured())
+    {
+        dec.meassure();
     }
     cv::imshow(wndname, image_rgb);
     cv::imshow(wndname2, image_depth);

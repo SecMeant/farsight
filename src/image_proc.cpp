@@ -61,15 +61,19 @@ detector::bbox detector::detect(byte* frame_base, byte *frame_object, size_t siz
 
 void detector::configure(int kinectID, cv::Mat &img, bbox &sizes)
 {
-    img.copyTo(sceneConfiguration[kinectID].img_object);
-    sceneConfiguration[kinectID].area = sizes;
-    sceneConfiguration[kinectID].imObjectSet= true;
+    auto & c = sceneConfiguration[kinectID];
+    img.copyTo(c.img_object);
+    c.area = sizes;
+    c.findDepth();
+    c.imObjectSet= true;
 }
 
 void detector::setBaseImg(int kinectID, cv::Mat &img)
 {
-    img.copyTo(sceneConfiguration[kinectID].img_base);
-    sceneConfiguration[kinectID].imBaseSet= true;
+    auto & c = sceneConfiguration[kinectID];
+    img.copyTo(c.img_base);
+    img.copyTo(c.img_base);
+    c.imBaseSet= true;
 }
 
 void detector::displayCurrectConfig()
@@ -90,7 +94,8 @@ void detector::displayCurrectConfig()
     {
         matRoi =cv::Rect(depth_width, 0, depth_width,depth_height);
         resize(c1.img_object, temp, cv::Size(depth_width,depth_height));
-        cv::putText(temp, "c1 object", {depth_width/10,50},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
+        cv::putText(temp, fmt::format("object {}x{} pixels ", c1.area.w, c1.area.h), {depth_width/10,50},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
+        cv::putText(temp, fmt::format("object depth {} cm ", c1.dep.depth), {depth_width/10,100},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
         temp.copyTo(configScreen(matRoi));
     }
 
@@ -106,13 +111,22 @@ void detector::displayCurrectConfig()
     {
         matRoi =cv::Rect(depth_width, depth_height, depth_width,depth_height);
         resize(c2.img_object, temp, cv::Size(depth_width,depth_height));
-        cv::putText(temp, "c2 object", {depth_width/10,depth_height/10},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
+        cv::putText(temp, fmt::format("object {}x{} pixels ", c2.area.w, c2.area.h), {depth_width/10,depth_height/10},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
+        cv::putText(temp, fmt::format("object depth {} cm ", c2.dep.depth), {depth_width/10,100},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
         temp.copyTo(configScreen(matRoi));
     }
     cv::imshow("Dupa", configScreen); 
 }
 
-void detector::presentResults()
+void detector::meassure()
 {
+    
+}
 
+bool detector::isFullyConfigured()
+{
+    const auto & c1 = sceneConfiguration[0];
+    const auto & c2 = sceneConfiguration[1];
+
+    return c1.imBaseSet && c1.imObjectSet && c2.imBaseSet && c2.imObjectSet;
 }
