@@ -82,6 +82,7 @@ void detector::displayCurrectConfig()
     {
         matRoi =cv::Rect(0, 0, depth_width, depth_height);
         resize(c1.img_base, temp, cv::Size(depth_width, depth_height));
+        cv::putText(temp, "c1 base", {50,50},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
         temp.copyTo(configScreen(matRoi));
     }
     
@@ -89,6 +90,7 @@ void detector::displayCurrectConfig()
     {
         matRoi =cv::Rect(depth_width, 0, depth_width,depth_height);
         resize(c1.img_object, temp, cv::Size(depth_width,depth_height));
+        cv::putText(temp, "c1 object", {depth_width/10,50},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
         temp.copyTo(configScreen(matRoi));
     }
 
@@ -96,6 +98,7 @@ void detector::displayCurrectConfig()
     {
         matRoi =cv::Rect(0, depth_height, depth_width, depth_height);
         resize(c2.img_base, temp, cv::Size(depth_width, depth_height));
+        cv::putText(temp, "c2 base", {50,depth_height/10},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
         temp.copyTo(configScreen(matRoi));
     }
     
@@ -103,6 +106,7 @@ void detector::displayCurrectConfig()
     {
         matRoi =cv::Rect(depth_width, depth_height, depth_width,depth_height);
         resize(c2.img_object, temp, cv::Size(depth_width,depth_height));
+        cv::putText(temp, "c2 object", {depth_width/10,depth_height/10},cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar::all(255), 3, 5);
         temp.copyTo(configScreen(matRoi));
     }
     cv::imshow("Dupa", configScreen); 
