@@ -85,3 +85,4 @@ depthProcess(libfreenect2::Frame *frame)
     fp[i] /= 4500.0f;
   }
 }
+

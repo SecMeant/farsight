@@ -13,15 +13,20 @@ detector::detector()
   configScreen =cv::Mat::zeros(cv::Size(depth_width*2 +10, depth_height*2+10), CV_8UC1);
 
 }
-detector::bbox detector::detect(byte* frame_base, byte *frame_object, size_t size, cv::Mat &image_depth)
+bbox detector::detect(int kinectID,const byte *frame_object, size_t size, cv::Mat &image_depth)
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
   bool clr = false;
 
-  diff(frame_object, frame_base, size);
+  std::array<byte, depth_width*depth_height> frame_depth_;
+  std::copy(frame_object,
+            frame_object + depth_width*depth_height,
+            frame_depth_.data());
+
+  diff(frame_depth_.data(), sceneConfiguration[kinectID].img_base.ptr(), size);
   auto image_depth_ =
-    cv::Mat(depth_height, depth_width, CV_8UC1, frame_object);
+    cv::Mat(depth_height, depth_width, CV_8UC1, frame_depth_.data());
   cv::Mat image_depth_th, image_depth_filtered;
   cv::threshold(image_depth_, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
   cv::inRange(image_depth_, lowerb2, higherb2, image_depth_filtered);
@@ -52,23 +57,23 @@ detector::bbox detector::detect(byte* frame_base, byte *frame_object, size_t siz
     }
   }
   
-  fmt::print("Area: {}\n", best_bbox.area);
+  fmt::print("x : {}, y {}, w : {}, h {},  Area: {}\n",best_bbox.x, best_bbox.y,best_bbox.w,best_bbox.h, best_bbox.area);
   cv::Scalar color(clr ? 255 : 0, 0, 0);
   cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
   cv::rectangle(image_depth, rect, color, 3);
   return best_bbox;
 }
 
-void detector::configure(int kinectID, cv::Mat &img, bbox &sizes)
+void detector::configure(int kinectID,const cv::Mat &img,const bbox &sizes, const depth_t &dep)
 {
     auto & c = sceneConfiguration[kinectID];
     img.copyTo(c.img_object);
     c.area = sizes;
-    c.findDepth();
+    c.dep = dep;
     c.imObjectSet= true;
 }
 
-void detector::setBaseImg(int kinectID, cv::Mat &img)
+void detector::setBaseImg(int kinectID,const cv::Mat &img)
 {
     auto & c = sceneConfiguration[kinectID];
     img.copyTo(c.img_base);
@@ -116,6 +121,14 @@ void detector::displayCurrectConfig()
         temp.copyTo(configScreen(matRoi));
     }
     cv::imshow("Dupa", configScreen); 
+}
+
+void detector::saveOriginalFrameObject(int kinectID, const libfreenect2::Frame *frame)
+{
+    auto & c = sceneConfiguration[kinectID];
+    std::copy(frame->data,
+        frame->data + detector::depth_total_size,
+        c.originalObjectFrame.get());
 }
 
 void detector::meassure()

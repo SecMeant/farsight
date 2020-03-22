@@ -11,16 +11,12 @@ extern "C"
 #include <unistd.h>
 }
 
-enum depth_type
-{
-    BASE,
-    WITH_OBJECT,
-};
 const char *wndname = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
 
+constexpr int avg_config_number = 100;
 std::atomic_flag continue_flag;
 
 using namespace cv;
@@ -50,10 +46,13 @@ main(int argc, char **argv)
   const size_t total_size_depth = depth_width*depth_height;
   const size_t rgb_width = 1920, rgb_height = 1080;
   int c = 0;
+  bbox box_avg;
+  depth_t dep_avg;
+  dep_avg.depth = 0;
   
-  int selectedKinnect =0;
+  int config_to_go = 1;
+  int selectedKinnect = 0;
 
-  std::array<byte, depth_width*depth_height> frame_depth_[2];
   detector dec;
   kinect k_dev(selectedKinnect);
 
@@ -63,7 +62,10 @@ main(int argc, char **argv)
     libfreenect2::Frame *rgb   = k_dev.frames[libfreenect2::Frame::Color];
     libfreenect2::Frame *ir    = k_dev.frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
-
+    if(c == 'c')
+    {
+        dec.saveOriginalFrameObject(selectedKinnect,depth);
+    }
     depthProcess(depth);
     
     conv32FC1To8CU1(depth->data , depth->height* depth->width);
@@ -77,27 +79,34 @@ main(int argc, char **argv)
         case 'b':
             {
               fmt::print("Setting {} kinect base image \n",selectedKinnect+1);
-              std::copy(depth->data,
-                        depth->data + total_size_depth,
-                        frame_depth_[BASE].data());
-              auto base_img=
-                cv::Mat(depth->height, depth->width, CV_8UC1, frame_depth_[BASE].data());
-              dec.setBaseImg(selectedKinnect, base_img);
+              dec.setBaseImg(selectedKinnect,image_depth);
               dec.displayCurrectConfig();
             }
         break;
         case 'c':
             {
               fmt::print("Making {} kinect configuration \n",selectedKinnect+1);
-              std::copy(depth->data,
-                        depth->data + total_size_depth,
-                        frame_depth_[WITH_OBJECT].data());
+              auto detectedBox = dec.detect(selectedKinnect,
+                        depth->data,
+                        total_size_depth,
+                        image_depth);
+              auto minDep = scopeMin<float>(detectedBox,dec.getOriginalFrameObject(selectedKinnect));
+              box_avg += detectedBox;
+              dep_avg.depth += minDep.depth;
 
-              auto detectedBox = dec.detect(frame_depth_[BASE].data(),
-                          frame_depth_[WITH_OBJECT].data(),
-                          total_size_depth,
-                          image_depth);
-              dec.configure(selectedKinnect, image_depth, detectedBox);
+              if( config_to_go < avg_config_number){
+                config_to_go++;
+                k_dev.releaseFrames();
+                continue;
+              }
+
+              minDep.depth = dep_avg.depth/avg_config_number;
+              detectedBox.w = box_avg.w/avg_config_number;
+              detectedBox.y = box_avg.h/avg_config_number;
+              dep_avg.depth = 0;
+              box_avg.reset();
+              config_to_go =1;
+              dec.configure(selectedKinnect, image_depth, detectedBox, minDep);
               dec.displayCurrectConfig();
             }
         break;
@@ -109,12 +118,13 @@ main(int argc, char **argv)
             selectedKinnect = 1;
             k_dev.open(selectedKinnect);
         break;
-
     }
+
     if(dec.isFullyConfigured())
     {
         dec.meassure();
     }
+
     cv::imshow(wndname, image_rgb);
     cv::imshow(wndname2, image_depth);
     c = cv::waitKey(100);
