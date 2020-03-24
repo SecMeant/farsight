@@ -25,6 +25,7 @@ struct bbox
        h += b.h;
        area += b.area;
    }
+
    void reset()
    {
        x = y = w =h =area =0;

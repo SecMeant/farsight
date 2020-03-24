@@ -122,6 +122,10 @@ main(int argc, char **argv)
 
     if(dec.isFullyConfigured())
     {
+        auto detectedBox = dec.detect(selectedKinnect,
+                  depth->data,
+                  total_size_depth,
+                  image_depth);
         dec.meassure();
     }
 

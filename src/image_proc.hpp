@@ -27,12 +27,13 @@ class detector
    void configure(int kinectID,const cv::Mat &img,const bbox &sizes, const depth_t &dep);
    void setBaseImg(int kinectID,const cv::Mat &img);
    void saveOriginalFrameObject(int kinectID, const libfreenect2::Frame *frame);
-   const byte* getOriginalFrameObject(int kinectID){
-    return sceneConfiguration[kinectID].originalObjectFrame.get();
-   }
    void meassure();
    void displayCurrectConfig();
    bool isFullyConfigured();
+   
+   const byte* getOriginalFrameObject(int kinectID){
+    return sceneConfiguration[kinectID].originalObjectFrame.get();
+   }
 
  private:
    cv::Ptr<cv::SimpleBlobDetector> det;
