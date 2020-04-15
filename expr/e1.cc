@@ -13,6 +13,7 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
+#include "trans.cc"
 const char *wndname = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
@@ -254,11 +255,7 @@ main(int argc, char **argv)
     cv::connectedComponentsWithStats(image_depth_filtered, labels, stats, centroids);
 
     clr = !clr;
-
-    struct bbox
-    {
-      int x, y, w, h, area;
-    }best_bbox;
+    bbox best_bbox = {0,0,0,0,0};
 
     int barea = 0;
     for (int i = 0; i < stats.rows; ++i)
@@ -294,10 +291,22 @@ main(int argc, char **argv)
 
     //cv::drawKeypoints(image_depth_th, kp, image_depth_th, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
     p = 0;
+    float t_x, t_y;
+    bbox c_bbox;
+    depth_to_color(best_bbox.x, best_bbox.y, t_x, t_y);
+    fmt::print("MAPPING {} {} {} {} \n", best_bbox.x, best_bbox.y, t_x, t_y);
+    c_bbox.x = t_x;
+    c_bbox.y = t_y;
+    depth_to_color(best_bbox.x + best_bbox.w, best_bbox.y + best_bbox.h, t_x, t_y);
+    c_bbox.w = t_x - best_bbox.x;
+    c_bbox.h = t_y - c_bbox.y;
+    fmt::print("MAPPING {} {} {} {} \n", best_bbox.x + best_bbox.w, best_bbox.y + best_bbox.h, t_x, t_y);
 
+    rect = cv::Rect(best_bbox.x,c_bbox.y,best_bbox.w,c_bbox.h);
+    cv::rectangle(image_rgb, rect, color, 3);
     cv::imshow(wndname3, image_depth);
-    //cv::imshow(wndname2, image_depth_filtered);
+    cv::imshow(wndname2, image_rgb);
 
-    c = cv::waitKey(100);
+    c = cv::waitKey(1000);
   }
 }
