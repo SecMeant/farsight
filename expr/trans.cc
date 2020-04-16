@@ -30,15 +30,15 @@ struct kincet_color
 
 struct kincet_depth
 {
-    float fx=365.481;
-    float fy=365.481;
-    float cx=257.346;
-    float cy=210.347;
-    float k1=0.089026;
-    float k2=-0.271706;
-    float k3=0.0982151;
-    float p1=0;
-    float p2=365.481;
+        float cx = 254.878f;
+        float cy = 205.395f;
+        float fx = 365.456f;
+        float fy = 365.456f;
+        float k1 = 0.0905474;
+        float k2 = -0.26819;
+        float k3 = 0.0950862;
+        float p1 = 0.0;
+        float p2 = 0.0;
 }depth;
 
 float depth_q = 0.01;
@@ -83,4 +83,13 @@ void depth_to_color(float mx, float my, float& rx, float& ry)
   rx = (wx / (color.fx * color_q)) - (color.shift_m / color.shift_d);
   ry = (wy / color_q) + color.cy;
 }
- 
+
+void f_apply( int dx, int dy, float dz, float& cx, float &cy, float map_x,float map_y)
+{
+  float rx = map_x;
+  cy = map_y;
+
+  rx += (color.shift_m / dz);
+  cx = rx * color.fx + color.cx;
+}
+

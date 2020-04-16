@@ -291,18 +291,20 @@ main(int argc, char **argv)
 
     //cv::drawKeypoints(image_depth_th, kp, image_depth_th, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
     p = 0;
-    float t_x, t_y;
+    float t_x, t_y, real_x, real_y;
     bbox c_bbox;
     depth_to_color(best_bbox.x, best_bbox.y, t_x, t_y);
-    fmt::print("MAPPING {} {} {} {} \n", best_bbox.x, best_bbox.y, t_x, t_y);
-    c_bbox.x = t_x;
-    c_bbox.y = t_y;
+    f_apply(best_bbox.x, best_bbox.y, 1600, real_x,real_y, t_x, t_y);
+    fmt::print("MAPPING {} {} {} {} \n", best_bbox.x, best_bbox.y, real_x, real_y);
+    c_bbox.x = real_x;
+    c_bbox.y = real_y;
     depth_to_color(best_bbox.x + best_bbox.w, best_bbox.y + best_bbox.h, t_x, t_y);
-    c_bbox.w = t_x - best_bbox.x;
-    c_bbox.h = t_y - c_bbox.y;
+    f_apply(best_bbox.x, best_bbox.y, 1650, real_x,real_y, t_x, t_y);
+    c_bbox.w = real_x - c_bbox.x;
+    c_bbox.h = real_y - c_bbox.y;
     fmt::print("MAPPING {} {} {} {} \n", best_bbox.x + best_bbox.w, best_bbox.y + best_bbox.h, t_x, t_y);
-
-    rect = cv::Rect(best_bbox.x,c_bbox.y,best_bbox.w,c_bbox.h);
+    
+    rect = cv::Rect(c_bbox.x,c_bbox.y,c_bbox.w,c_bbox.h);
     cv::rectangle(image_rgb, rect, color, 3);
     cv::imshow(wndname3, image_depth);
     cv::imshow(wndname2, image_rgb);
