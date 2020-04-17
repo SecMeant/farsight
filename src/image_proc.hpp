@@ -31,7 +31,7 @@ class detector
    void configure(int kinectID,const cv::Mat &img, cv::Mat &rgb,const bbox &sizes, const depth_t &dep);
    void setBaseImg(int kinectID,const cv::Mat &img);
    void saveOriginalFrameObject(int kinectID, const libfreenect2::Frame *frame);
-   void meassure();
+   void meassure(int kinectID, const bbox & o_area, int depth);
    void displayCurrectConfig();
    bool isFullyConfigured();
    

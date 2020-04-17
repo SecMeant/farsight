@@ -126,7 +126,8 @@ main(int argc, char **argv)
                   depth->data,
                   total_size_depth,
                   image_depth);
-        dec.meassure();
+        int dummy_depth = 10;
+        dec.meassure(selectedKinnect, detectedBox, dummy_depth);
     }
 
     cv::imshow(wndname, image_rgb);

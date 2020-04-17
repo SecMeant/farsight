@@ -11,8 +11,8 @@ detector::detector(libfreenect2::Freenect2Device::IrCameraParams depth_config, l
 
   det = cv::SimpleBlobDetector::create(params);
   configScreen =cv::Mat::zeros(cv::Size(depth_width*2 +10, depth_height*2+10), CV_8UC1);
-
 }
+
 bbox detector::detect(int kinectID,const byte *frame_object, size_t size, cv::Mat &image_depth)
 {
   int lowerb = 0, higherb = 255;
@@ -68,7 +68,8 @@ bbox detector::transform(const objectConfig &c)
     bbox out;
     const auto& in = c.area;
     const auto& org_dep =  c.originalObjectFrame;
-    float rgb_x, rgb_y; 
+    float rgb_x, rgb_y;
+
     int pos = in.y*depth_width + in.x;
     reg.apply(in.x, in.y, org_dep[pos], rgb_x, rgb_y);
     out.x = rgb_x;
@@ -155,9 +156,20 @@ void detector::saveOriginalFrameObject(int kinectID, const libfreenect2::Frame *
         c.originalObjectFrame.get());
 }
 
-void detector::meassure()
+void detector::meassure(int kinectID, const bbox & o_area, int depth)
 {
-    
+   auto &c = sceneConfiguration[kinectID];
+   
+   // calc alfa, we can use tanges relation her x/h
+   double alpha_w_ref = (double(c.area.w))/c.dep.depth;
+   double alpha_h_ref = (double(c.area.h))/c.dep.depth;
+   
+   double alpha_w = (double(o_area.w))/depth;
+   double alpha_h = (double(o_area.h))/depth;
+  
+   double object_w = (alpha_w/alpha_w_ref)*cubeWidth;
+   double object_h = (alpha_h/alpha_h_ref)*cubeWidth;
+   fmt::print("Object size: {} {}\n", object_w, object_h);
 }
 
 bool detector::isFullyConfigured()
