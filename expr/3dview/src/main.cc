@@ -12,10 +12,17 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 
-typedef float point3[3];
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
-static GLfloat viewer[] = { 5.0, 0.0, 0.0 };
-static GLfloat viewer_up[] = { 0.0, 1.0, 0.0 };
+using glm::vec3;
+using glm::value_ptr;
+using glm::normalize;
+using glm::cross;
+using glm::dot;
+
+static vec3 viewer = { 5.0, 0.0, 0.0 };
+static vec3 viewer_up = { 0.0, 1.0, 0.0 };
 static GLfloat mouse_sens = 1.0f / std::pow(2.0f, 9.0f);
 constexpr static GLfloat mouse_horizontal_max = M_PI * 2.0;
 constexpr static GLfloat mouse_horizontal_min = 0;
@@ -24,7 +31,7 @@ constexpr static GLfloat mouse_vertical_min = -(M_PI / 2.0 - 0.1);
 static GLfloat mouse_horizontal = mouse_horizontal_max / 2.0;
 static GLfloat mouse_vertical =
   (mouse_vertical_max - mouse_vertical_min) / 2.0;
-static GLfloat lookat[] = { 0.0, 0.0, 1.0f };
+static vec3 lookat = { 0.0, 0.0, 1.0f };
 static GLsizei XLOCK_POS = 256, YLOCK_POS = 256;
 static bool lock_mouse = true;
 
@@ -47,40 +54,40 @@ std::vector<float> points;
 static void
 Axes(void)
 {
-  point3 x_min = { -50.0, 0.0, 0.0 };
-  point3 x_max = { 50.0, 0.0, 0.0 };
+  vec3 x_min = { -50.0, 0.0, 0.0 };
+  vec3 x_max = { 50.0, 0.0, 0.0 };
 
-  point3 y_min = { 0.0, -50.0, 0.0 };
-  point3 y_max = { 0.0, 50.0, 0.0 };
+  vec3 y_min = { 0.0, -50.0, 0.0 };
+  vec3 y_max = { 0.0, 50.0, 0.0 };
 
-  point3 z_min = { 0.0, 0.0, -50.0 };
-  point3 z_max = { 0.0, 0.0, 50.0 };
+  vec3 z_min = { 0.0, 0.0, -50.0 };
+  vec3 z_max = { 0.0, 0.0, 50.0 };
 
   glColor3f(1.0f, 0.0f, 0.0f);
   glBegin(GL_LINES);
 
-  glVertex3fv(x_min);
-  glVertex3fv(x_max);
+  glVertex3fv(value_ptr(x_min));
+  glVertex3fv(value_ptr(x_max));
 
   glEnd();
 
   glColor3f(0.0f, 0.5f, 0.0f);
   glBegin(GL_LINES);
-  glVertex3fv(y_min);
+  glVertex3fv(value_ptr(y_min));
   glVertex3f(0, 0, 0);
   glEnd();
 
   glColor3f(0.0f, 1.0f, 0.0f);
   glBegin(GL_LINES);
-  glVertex3fv(y_max);
+  glVertex3fv(value_ptr(y_max));
   glVertex3f(0, 0, 0);
   glEnd();
 
   glColor3f(1.0f, 1.0f, 1.0f);
   glBegin(GL_LINES);
 
-  glVertex3fv(z_min);
-  glVertex3fv(z_max);
+  glVertex3fv(value_ptr(z_min));
+  glVertex3fv(value_ptr(z_max));
 
   glEnd();
 }
@@ -222,46 +229,6 @@ Motion(GLsizei x, GLsizei y)
   glutPostRedisplay();
 }
 
-constexpr static void
-cross3fv(float *a, const float *b)
-{
-  float r[3]{};
-
-  r[0] = a[1] * b[2] - a[2] * b[1];
-  r[1] = a[2] * b[0] - a[0] * b[2];
-  r[2] = a[0] * b[1] - a[1] * b[0];
-
-  a[0] = r[0];
-  a[1] = r[1];
-  a[2] = r[2];
-}
-
-static void
-cross3fv(float vR[], float v1[], float v2[])
-{
-  vR[0] = ((v1[1] * v2[2]) - (v1[2] * v2[1]));
-  vR[1] = -((v1[0] * v2[2]) - (v1[2] * v2[0]));
-  vR[2] = ((v1[0] * v2[1]) - (v1[1] * v2[0]));
-}
-
-static float
-dot3fv(float v1[], float v2[])
-{
-  return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
-}
-
-static void
-norm3fv(float vR[], float v1[])
-{
-  float mag;
-
-  mag = sqrt(pow(v1[0], 2) + pow(v1[1], 2) + pow(v1[2], 2));
-
-  vR[0] = v1[0] / mag;
-  vR[1] = v1[1] / mag;
-  vR[2] = v1[2] / mag;
-}
-
 static void
 Keyboard(unsigned char key, int x, int y)
 {
@@ -298,9 +265,9 @@ Keyboard(unsigned char key, int x, int y)
       break;
 
     case 'd': {
-      float crossv[3];
-      cross3fv(crossv, lookat, viewer_up);
-      norm3fv(crossv, crossv);
+      vec3 crossv;
+      crossv = glm::cross(lookat, viewer_up);
+      glm::normalize(crossv);
       viewer[0] += crossv[0] * camera_speed;
       viewer[1] += crossv[1] * camera_speed;
       viewer[2] += crossv[2] * camera_speed;
@@ -310,9 +277,8 @@ Keyboard(unsigned char key, int x, int y)
     }
 
     case 'a': {
-      float crossv[3];
-      cross3fv(crossv, lookat, viewer_up);
-      norm3fv(crossv, crossv);
+      vec3 crossv = cross(lookat, viewer_up);
+      normalize(crossv);
       viewer[0] -= crossv[0] * camera_speed;
       viewer[1] -= crossv[1] * camera_speed;
       viewer[2] -= crossv[2] * camera_speed;
