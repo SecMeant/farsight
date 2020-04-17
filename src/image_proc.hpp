@@ -3,6 +3,8 @@
 #include <cmath>
 #include<memory>
 #include<fmt/format.h>
+#include <libfreenect2/registration.h>
+
 class detector
 {
  public:
@@ -15,16 +17,18 @@ class detector
        std::unique_ptr<byte[]> originalObjectFrame = std::make_unique<byte[]>(depth_total_size);
        cv::Mat img_base;
        cv::Mat img_object;
+       cv::Mat img_rgb;
        bbox area;
+       bbox rgb_area;
        depth_t dep;
        bool imBaseSet = false, imObjectSet= false;
    };
 
    // public methods
-   detector();
+   detector(libfreenect2::Freenect2Device::IrCameraParams depth_config, libfreenect2::Freenect2Device::ColorCameraParams rgb_config);
 
    bbox detect(int kinectID, const byte *frame_object, size_t size,cv::Mat &image_depth);
-   void configure(int kinectID,const cv::Mat &img,const bbox &sizes, const depth_t &dep);
+   void configure(int kinectID,const cv::Mat &img, cv::Mat &rgb,const bbox &sizes, const depth_t &dep);
    void setBaseImg(int kinectID,const cv::Mat &img);
    void saveOriginalFrameObject(int kinectID, const libfreenect2::Frame *frame);
    void meassure();
@@ -43,8 +47,9 @@ class detector
    std::array<objectConfig, maxKinectCount> sceneConfiguration;
    cv::Mat configScreen;
    cv::Rect matRoi;
-
+   libfreenect2::Registration reg;
+   
    void presentResults();
+   bbox transform(const objectConfig &c); 
 };
-
 

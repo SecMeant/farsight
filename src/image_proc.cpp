@@ -1,9 +1,9 @@
 #include "image_proc.hpp"
 #include <fmt/format.h>
 
-detector::detector()
+detector::detector(libfreenect2::Freenect2Device::IrCameraParams depth_config, libfreenect2::Freenect2Device::ColorCameraParams rgb_config)
+: reg(depth_config, rgb_config)
 {
-
   cv::SimpleBlobDetector::Params params;
   params.filterByArea = true;
   params.minArea = 5;
@@ -57,20 +57,44 @@ bbox detector::detect(int kinectID,const byte *frame_object, size_t size, cv::Ma
     }
   }
   
-  fmt::print("x : {}, y {}, w : {}, h {},  Area: {}\n",best_bbox.x, best_bbox.y,best_bbox.w,best_bbox.h, best_bbox.area);
   cv::Scalar color(clr ? 255 : 0, 0, 0);
   cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
   cv::rectangle(image_depth, rect, color, 3);
   return best_bbox;
 }
 
-void detector::configure(int kinectID,const cv::Mat &img,const bbox &sizes, const depth_t &dep)
+bbox detector::transform(const objectConfig &c)
+{
+    bbox out;
+    const auto& in = c.area;
+    const auto& org_dep =  c.originalObjectFrame;
+    float rgb_x, rgb_y; 
+    int pos = in.y*depth_width + in.x;
+    reg.apply(in.x, in.y, org_dep[pos], rgb_x, rgb_y);
+    out.x = rgb_x;
+    out.y = rgb_y;
+
+    pos = (in.y+in.h)*depth_width + (in.x + in.w);
+    reg.apply(in.x+in.w, in.y+in.h, org_dep[pos], rgb_x, rgb_y);
+    out.w = rgb_x - out.x;
+    out.h = rgb_y - out.y;
+    return out;
+}
+
+void detector::configure(int kinectID,const cv::Mat &img, cv::Mat &rgb,const bbox &sizes, const depth_t &dep)
 {
     auto & c = sceneConfiguration[kinectID];
     img.copyTo(c.img_object);
+    rgb.copyTo(c.img_rgb);
     c.area = sizes;
+    c.rgb_area = transform(c);
     c.dep = dep;
     c.imObjectSet= true;
+
+    cv::Scalar color(0, 0, 0);
+    cv::Rect rect(c.rgb_area.x,c.rgb_area.y,c.rgb_area.w,c.rgb_area.h);
+    cv::rectangle(c.img_rgb, rect, color, 3);
+    cv::imshow("test_to_be_removed", c.img_rgb);
 }
 
 void detector::setBaseImg(int kinectID,const cv::Mat &img)

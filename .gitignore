@@ -1,2 +1,5 @@
 depends/
 build/
+tags
+# VIM: Swap-files
+*.s[a-w][a-z]

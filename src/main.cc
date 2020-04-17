@@ -53,8 +53,8 @@ main(int argc, char **argv)
   int config_to_go = 1;
   int selectedKinnect = 0;
 
-  detector dec;
   kinect k_dev(selectedKinnect);
+  detector dec(k_dev.dev->getIrCameraParams(), k_dev.dev->getColorCameraParams());
 
   while (continue_flag.test_and_set() and c != 'q')
   {
@@ -106,7 +106,7 @@ main(int argc, char **argv)
               dep_avg.depth = 0;
               box_avg.reset();
               config_to_go =1;
-              dec.configure(selectedKinnect, image_depth, detectedBox, minDep);
+              dec.configure(selectedKinnect, image_depth, image_rgb, detectedBox, minDep);
               dec.displayCurrectConfig();
             }
         break;
