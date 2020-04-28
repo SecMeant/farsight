@@ -161,15 +161,16 @@ void detector::meassure(int kinectID, const bbox & o_area, int depth)
    auto &c = sceneConfiguration[kinectID];
    
    // calc alfa, we can use tanges relation her x/h
-   double alpha_w_ref = (double(c.area.w))/c.dep.depth;
-   double alpha_h_ref = (double(c.area.h))/c.dep.depth;
+   double alpha_w_ref = atan(((double(c.hrea.w))/c.dep.depth);
+   double alpha_h_ref = atan((double(c.area.h))/c.dep.depth);
    
-   double alpha_w = (double(o_area.w))/depth;
-   double alpha_h = (double(o_area.h))/depth;
+   double alpha_w = atan((double(o_area.w))/depth);
+   double alpha_h = atan((double(o_area.h))/depth);
   
    double object_w = (alpha_w/alpha_w_ref)*cubeWidth;
    double object_h = (alpha_h/alpha_h_ref)*cubeWidth;
    fmt::print("Object size: {} {}\n", object_w, object_h);
+
 }
 
 bool detector::isFullyConfigured()
