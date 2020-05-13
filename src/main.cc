@@ -1,10 +1,10 @@
+#include <cmath>
 #include <memory>
 #include <stdio.h>
-#include <cmath>
 
-#include <fmt/ostream.h>
 #include "image_proc.hpp"
 #include "kinect_manager.hpp"
+#include <fmt/ostream.h>
 extern "C"
 {
 #include <signal.h>
@@ -43,14 +43,14 @@ main(int argc, char **argv)
     exit(-2);
   }
   const size_t depth_width = 512, depth_height = 424;
-  const size_t total_size_depth = depth_width*depth_height;
+  const size_t total_size_depth = depth_width * depth_height;
   const size_t rgb_width = 1920, rgb_height = 1080;
   int c = 0;
   bbox box_avg;
   depth_t dep_avg;
   dep_avg.depth = 0;
-  
-  int config_to_go = 1;
+
+  int config_to_go = 0; // 1?
   int selectedKinnect = 0;
 
   detector dec;
@@ -59,74 +59,78 @@ main(int argc, char **argv)
   while (continue_flag.test_and_set() and c != 'q')
   {
     k_dev.waitForFrames(10);
-    libfreenect2::Frame *rgb   = k_dev.frames[libfreenect2::Frame::Color];
-    libfreenect2::Frame *ir    = k_dev.frames[libfreenect2::Frame::Ir];
+    libfreenect2::Frame *rgb = k_dev.frames[libfreenect2::Frame::Color];
+    libfreenect2::Frame *ir = k_dev.frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
-    if(c == 'c')
+    if (c == 'c')
     {
-        dec.saveOriginalFrameObject(selectedKinnect,depth);
+      dec.saveOriginalFrameObject(selectedKinnect, depth);
     }
     depthProcess(depth);
-    
-    conv32FC1To8CU1(depth->data , depth->height* depth->width);
- 
+
+    conv32FC1To8CU1(depth->data, depth->height * depth->width);
+
     auto image_depth =
       cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
     auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-    
-    switch(c)
+
+    switch (c)
     {
-        case 'b':
-            {
-              fmt::print("Setting {} kinect base image \n",selectedKinnect+1);
-              dec.setBaseImg(selectedKinnect,image_depth);
-              dec.displayCurrectConfig();
-            }
+      case 'b': {
+        fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
+        dec.setBaseImg(selectedKinnect, image_depth);
+        dec.displayCurrectConfig();
+      }
+      break;
+      case 'c': // configure camera postion
+                // TODO Hlz
         break;
-        case 'c':
-            {
-              fmt::print("Making {} kinect configuration \n",selectedKinnect+1);
-              auto detectedBox = dec.detect(selectedKinnect,
-                        depth->data,
-                        total_size_depth,
-                        image_depth);
-              auto minDep = scopeMin<float>(detectedBox,dec.getOriginalFrameObject(selectedKinnect));
-              box_avg += detectedBox;
-              dep_avg.depth += minDep.depth;
+      case 'o': // find object depth
+      {
+        fmt::print("Making {} kinect configuration \n",
+                   selectedKinnect + 1);
+        auto detectedBox = dec.detect(
+          selectedKinnect, depth->data, total_size_depth, image_depth);
+        auto minDep = scopeMin<float>(
+          detectedBox, dec.getOriginalFrameObject(selectedKinnect));
+        box_avg += detectedBox;
+        dep_avg.depth += minDep.depth;
 
-              if( config_to_go < avg_config_number){
-                config_to_go++;
-                k_dev.releaseFrames();
-                continue;
-              }
+        if (config_to_go < avg_config_number)
+        {
+          config_to_go++;
+          k_dev.releaseFrames();
+          continue;
+        }
 
-              minDep.depth = dep_avg.depth/avg_config_number;
-              detectedBox.w = box_avg.w/avg_config_number;
-              detectedBox.y = box_avg.h/avg_config_number;
-              dep_avg.depth = 0;
-              box_avg.reset();
-              config_to_go =1;
-              dec.configure(selectedKinnect, image_depth, detectedBox, minDep);
-              dec.displayCurrectConfig();
-            }
+        minDep.depth = dep_avg.depth / avg_config_number;
+        detectedBox.w = box_avg.w / avg_config_number;
+        detectedBox.y = box_avg.h / avg_config_number;
+        dep_avg.depth = 0;
+        box_avg.reset();
+        config_to_go = 0; // 1?
+        dec.configure(selectedKinnect, image_depth, detectedBox, minDep);
+        dec.displayCurrectConfig();
+      }
+      break;
+      case '1':
+        selectedKinnect = 0;
+        k_dev.open(selectedKinnect);
         break;
-        case '1':
-            selectedKinnect = 0;
-            k_dev.open(selectedKinnect);
-        break;
-        case '2':
-            selectedKinnect = 1;
-            k_dev.open(selectedKinnect);
+      case '2':
+        selectedKinnect = 1;
+        k_dev.open(selectedKinnect);
         break;
     }
 
-    if(dec.isFullyConfigured())
+    if (dec.isFullyConfigured())
     {
-        auto detectedBox = dec.detect(selectedKinnect,
-                  depth->data,
-                  total_size_depth,
-                  image_depth);
-        dec.meassure();
+      // remove points which are still visible and are in detected
+      // rectangle
+
+      // collect data set and detect smallest rectangle based on points,
+
+      // draw smallest dimensions
     }
 
     cv::imshow(wndname, image_rgb);

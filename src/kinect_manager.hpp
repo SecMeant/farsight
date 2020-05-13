@@ -7,20 +7,27 @@
 
 struct kinect
 {
-    kinect();
-    kinect(int d_idx);
-    ~kinect();
-    void open(int d_idx);
-    void waitForFrames(int sec);
-    void releaseFrames();
-    void close();
-    
-    bool isActive = false;
-    
-    libfreenect2::SyncMultiFrameListener listener;
-    libfreenect2::FrameMap frames;
-    libfreenect2::Freenect2Device *dev;
-    libfreenect2::Freenect2 freenect2;
+  struct position
+  {
+    double x, y, z;
+  };
+  kinect();
+  kinect(int d_idx);
+  ~kinect();
+  void
+  open(int d_idx);
+  void
+  waitForFrames(int sec);
+  void
+  releaseFrames();
+  void
+  close();
 
+  bool isActive = false;
+
+  libfreenect2::SyncMultiFrameListener listener;
+  libfreenect2::FrameMap frames;
+  libfreenect2::Freenect2Device *dev;
+  libfreenect2::Freenect2 freenect2;
+  position pos;
 };
-
