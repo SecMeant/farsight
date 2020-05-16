@@ -1,0 +1,35 @@
+#pragma once
+#include "image_utils.hpp"
+#include "config.hpp"
+#include <type_traits>
+
+enum class objectType : unsigned int
+{
+    REFERENCE_OBJ,
+    MEASURED_OBJ
+};
+template <typename E>
+constexpr auto to_underlying(E e) noexcept
+{
+    return static_cast<std::underlying_type_t<E>>(e);
+}
+
+struct object_t
+{
+    bbox area;
+    position nearest_point;
+    cv::Mat imgDepth = cv::Mat::zeros(
+        cv::Size(depth_width, depth_height), CV_8UC1); 
+    std::unique_ptr<byte[]> depthFrame =
+      std::make_unique<byte[]>(total_size_depth);
+};
+
+constexpr int objectsPerCamera = 2;
+using objectArray = std::array<object_t, objectsPerCamera>;
+
+struct cameraConfig
+{
+    position selfPosition;
+    cv::Mat img_base;
+    objectArray objects;
+};
