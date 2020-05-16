@@ -7,10 +7,6 @@
 
 struct kinect
 {
-  struct position
-  {
-    double x, y, z;
-  };
   kinect();
   kinect(int d_idx);
   ~kinect();
@@ -29,5 +25,4 @@ struct kinect
   libfreenect2::FrameMap frames;
   libfreenect2::Freenect2Device *dev;
   libfreenect2::Freenect2 freenect2;
-  position pos;
 };

@@ -3,7 +3,6 @@
 
 detector::detector()
 {
-
   cv::SimpleBlobDetector::Params params;
   params.filterByArea = true;
   params.minArea = 5;
@@ -15,21 +14,21 @@ detector::detector()
 }
 bbox
 detector::detect(int kinectID,
-                 const byte *frame_object,
+                 const byte *frameObject,
                  size_t size,
-                 cv::Mat &image_depth)
+                 cv::Mat &imageDepth)
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
   bool clr = false;
 
   std::array<byte, depth_width * depth_height> frame_depth_;
-  std::copy(frame_object,
-            frame_object + depth_width * depth_height,
+  std::copy(frameObject,
+            frameObject + depth_width * depth_height,
             frame_depth_.data());
 
   diff(frame_depth_.data(),
-       objectConfigs[kinectID].img_base.ptr(),
+       config[kinectID].img_base.ptr(),
        size);
   auto image_depth_ =
     cv::Mat(depth_height, depth_width, CV_8UC1, frame_depth_.data());
@@ -74,43 +73,34 @@ detector::detect(int kinectID,
              best_bbox.area);
   cv::Scalar color(clr ? 255 : 0, 0, 0);
   cv::Rect rect(best_bbox.x, best_bbox.y, best_bbox.w, best_bbox.h);
-  cv::rectangle(image_depth, rect, color, 3);
+  cv::rectangle(imageDepth, rect, color, 3);
   return best_bbox;
 }
 
 void
-detector::configure(int kinectID,
+detector::setConfig(int kinectID,
+                    const objectType t,
                     const cv::Mat &img,
-                    const bbox &sizes,
-                    const depth_t &dep)
+                    const bbox &a,
+                    const position &p)
 {
-  auto &c = objectConfigs[kinectID];
-  img.copyTo(c.img_object);
-  c.area = sizes;
-  c.nearest_point = dep;
-  c.imObjectSet = true;
-}
-
-void
-detector::setBaseImg(int kinectID, const cv::Mat &img)
-{
-  auto &c = objectConfigs[kinectID];
-  img.copyTo(c.img_base);
-  img.copyTo(c.img_base);
-  c.imBaseSet = true;
+  auto &c =config[kinectID].objects[to_underlying(t)];
+  c.area = a;
+  c.nearest_point = p;
+  img.copyTo(c.imgDepth);
 }
 
 void
 detector::displayCurrectConfig()
 {
-  const auto &c1 = objectConfigs[0];
-  const auto &c2 = objectConfigs[1];
+  const auto &c1_r = config[0].objects[to_underlying(objectType::REFERENCE_OBJ)];
+  const auto &c1_m = config[0].objects[to_underlying(objectType::MEASURED_OBJ)];
+  const auto &c2_r = config[1].objects[to_underlying(objectType::REFERENCE_OBJ)];
+  const auto &c2_m = config[1].objects[to_underlying(objectType::MEASURED_OBJ)];
   cv::Mat temp;
 
-  if (c1.imBaseSet == true)
-  {
     matRoi = cv::Rect(0, 0, depth_width, depth_height);
-    resize(c1.img_base, temp, cv::Size(depth_width, depth_height));
+    resize(c1_r.imgDepth, temp, cv::Size(depth_width, depth_height));
     cv::putText(temp,
                 "c1 base",
                 { 50, 50 },
@@ -120,14 +110,11 @@ detector::displayCurrectConfig()
                 3,
                 5);
     temp.copyTo(configScreen(matRoi));
-  }
 
-  if (c1.imObjectSet == true)
-  {
     matRoi = cv::Rect(depth_width, 0, depth_width, depth_height);
-    resize(c1.img_object, temp, cv::Size(depth_width, depth_height));
+    resize(c1_m.imgDepth, temp, cv::Size(depth_width, depth_height));
     cv::putText(temp,
-                fmt::format("object {}x{} pixels ", c1.area.w, c1.area.h),
+                fmt::format("object {}x{} pixels ", c1_m.area.w, c1_m.area.h),
                 { depth_width / 10, 50 },
                 cv::FONT_HERSHEY_PLAIN,
                 2,
@@ -135,7 +122,7 @@ detector::displayCurrectConfig()
                 3,
                 5);
     cv::putText(temp,
-                fmt::format("object depth {} cm ", c1.nearest_point.depth),
+                fmt::format("object depth {} cm ", c2_r.nearest_point.z),
                 { depth_width / 10, 100 },
                 cv::FONT_HERSHEY_PLAIN,
                 2,
@@ -143,12 +130,9 @@ detector::displayCurrectConfig()
                 3,
                 5);
     temp.copyTo(configScreen(matRoi));
-  }
 
-  if (c2.imBaseSet == true)
-  {
     matRoi = cv::Rect(0, depth_height, depth_width, depth_height);
-    resize(c2.img_base, temp, cv::Size(depth_width, depth_height));
+    resize(c2_r.imgDepth, temp, cv::Size(depth_width, depth_height));
     cv::putText(temp,
                 "c2 base",
                 { 50, depth_height / 10 },
@@ -158,15 +142,12 @@ detector::displayCurrectConfig()
                 3,
                 5);
     temp.copyTo(configScreen(matRoi));
-  }
 
-  if (c2.imObjectSet == true)
-  {
     matRoi =
       cv::Rect(depth_width, depth_height, depth_width, depth_height);
-    resize(c2.img_object, temp, cv::Size(depth_width, depth_height));
+    resize(c2_m.imgDepth, temp, cv::Size(depth_width, depth_height));
     cv::putText(temp,
-                fmt::format("object {}x{} pixels ", c2.area.w, c2.area.h),
+                fmt::format("object {}x{} pixels ", c2_m.area.w, c2_m.area.h),
                 { depth_width / 10, depth_height / 10 },
                 cv::FONT_HERSHEY_PLAIN,
                 2,
@@ -174,7 +155,7 @@ detector::displayCurrectConfig()
                 3,
                 5);
     cv::putText(temp,
-                fmt::format("object depth {} cm ", c2.nearest_point.depth),
+                fmt::format("object depth {} cm ", c2_m.nearest_point.z),
                 { depth_width / 10, 100 },
                 cv::FONT_HERSHEY_PLAIN,
                 2,
@@ -182,29 +163,28 @@ detector::displayCurrectConfig()
                 3,
                 5);
     temp.copyTo(configScreen(matRoi));
-  }
+
   cv::imshow("config", configScreen);
 }
 
 void
-detector::saveOriginalFrameObject(int kinectID,
-                                  const libfreenect2::Frame *frame)
+detector::saveDepthFrame(int kinectID,
+                         const objectType t,
+                         const libfreenect2::Frame *frame)
 {
-  auto &c = objectConfigs[kinectID];
+  auto &c = config[kinectID].objects[to_underlying(t)];
   std::copy(frame->data,
-            frame->data + detector::depth_total_size,
-            c.originalObjectFrame.get());
+            frame->data + total_size_depth*sizeof(float),
+            c.depthFrame.get());
+}
+
+void
+detector::setBaseImg(int kinectID, const cv::Mat &img)
+{
+  auto &c = config[kinectID];
+  img.copyTo(c.img_base);
 }
 
 void
 detector::meassure()
 {}
-
-bool
-detector::isFullyConfigured()
-{
-  const auto &c1 = objectConfigs[0];
-  const auto &c2 = objectConfigs[1];
-
-  return c1.imBaseSet && c1.imObjectSet && c2.imBaseSet && c2.imObjectSet;
-}

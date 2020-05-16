@@ -11,12 +11,12 @@ extern "C"
 #include <unistd.h>
 }
 
-const char *wndname = "wnd";
+const char *wndname  = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
 
-constexpr int avg_config_number = 100;
+constexpr int avg_max_number = 100;
 std::atomic_flag continue_flag;
 
 using namespace cv;
@@ -42,15 +42,12 @@ main(int argc, char **argv)
     fmt::print("Failed to register signal handler.\n");
     exit(-2);
   }
-  const size_t depth_width = 512, depth_height = 424;
-  const size_t total_size_depth = depth_width * depth_height;
-  const size_t rgb_width = 1920, rgb_height = 1080;
   int c = 0;
-  bbox box_avg;
-  depth_t dep_avg;
-  dep_avg.depth = 0;
+  bbox boxAverage;
+  position nearestPointAvg;
+  nearestPointAvg.z= 0;
 
-  int config_to_go = 0; // 1?
+  int avg_number = 0; // 1?
   int selectedKinnect = 0;
 
   detector dec;
@@ -62,10 +59,14 @@ main(int argc, char **argv)
     libfreenect2::Frame *rgb = k_dev.frames[libfreenect2::Frame::Color];
     libfreenect2::Frame *ir = k_dev.frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
-    if (c == 'c')
+    if (c == 'r')
     {
-      dec.saveOriginalFrameObject(selectedKinnect, depth);
+      dec.saveDepthFrame(selectedKinnect, objectType::REFERENCE_OBJ, depth);
+    }else if(c == '0')
+    {
+      dec.saveDepthFrame(selectedKinnect, objectType::MEASURED_OBJ, depth);
     }
+
     depthProcess(depth);
 
     conv32FC1To8CU1(depth->data, depth->height * depth->width);
@@ -82,34 +83,33 @@ main(int argc, char **argv)
         dec.displayCurrectConfig();
       }
       break;
-      case 'c': // configure camera postion
-                // TODO Hlz
+      case 'c':
+        break;
+      case 'r': 
+            
         break;
       case 'o': // find object depth
       {
-        fmt::print("Making {} kinect configuration \n",
-                   selectedKinnect + 1);
         auto detectedBox = dec.detect(
           selectedKinnect, depth->data, total_size_depth, image_depth);
-        auto minDep = scopeMin<float>(
-          detectedBox, dec.getOriginalFrameObject(selectedKinnect));
-        box_avg += detectedBox;
-        dep_avg.depth += minDep.depth;
+        auto nearestPoint = findNearestPoint<float>(
+          detectedBox, dec.getDepthFrame(selectedKinnect,objectType::MEASURED_OBJ));
+        boxAverage += detectedBox;
+        nearestPointAvg.z += nearestPoint.z;
 
-        if (config_to_go < avg_config_number)
+        if (avg_number < avg_max_number)
         {
-          config_to_go++;
+          avg_number++;
           k_dev.releaseFrames();
           continue;
         }
-
-        minDep.depth = dep_avg.depth / avg_config_number;
-        detectedBox.w = box_avg.w / avg_config_number;
-        detectedBox.y = box_avg.h / avg_config_number;
-        dep_avg.depth = 0;
-        box_avg.reset();
-        config_to_go = 0; // 1?
-        dec.configure(selectedKinnect, image_depth, detectedBox, minDep);
+        nearestPoint.z= nearestPointAvg.z/ avg_max_number;
+        detectedBox.w = boxAverage.w / avg_max_number;
+        detectedBox.y = boxAverage.h / avg_max_number;
+        nearestPointAvg.z= 0;
+        boxAverage.reset();
+        avg_number = 0; // 1?
+        dec.setConfig(selectedKinnect, objectType::MEASURED_OBJ, image_depth, detectedBox, nearestPoint);
         dec.displayCurrectConfig();
       }
       break;
@@ -123,7 +123,7 @@ main(int argc, char **argv)
         break;
     }
 
-    if (dec.isFullyConfigured())
+    if (dec.isConfigured())
     {
       // remove points which are still visible and are in detected
       // rectangle

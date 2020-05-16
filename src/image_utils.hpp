@@ -1,4 +1,4 @@
-#pragma ocne
+#pragma once
 #include <climits>
 #include <libfreenect2/libfreenect2.hpp>
 #include <opencv2/core/core.hpp>
@@ -9,12 +9,10 @@
 #include <opencv2/photo.hpp>
 
 using byte = unsigned char;
-struct depth_t
+
+struct position
 {
-  static inline constexpr double maxDepth =
-    std::numeric_limits<double>::max();
-  int pixel_x = 0, pixel_y = 0;
-  double depth = maxDepth;
+    double x, y, z;
 };
 
 struct bbox
@@ -55,11 +53,11 @@ depthProcess(libfreenect2::Frame *frame);
 
 // byte, short, int, float ...
 template<typename Format>
-depth_t
-scopeMin(const bbox &area, const byte *frame)
+position
+findNearestPoint(const bbox &area, const byte *frame)
 {
-  constexpr int ms_to_s = 1000;
-  depth_t dep;
+  constexpr int mm_to_cm = 10;
+  position dep;
   int pos = area.y * area.w + area.x;
   const auto *depth = reinterpret_cast<const Format *>(frame);
 
@@ -68,14 +66,14 @@ scopeMin(const bbox &area, const byte *frame)
     auto x = (area.x + (i % area.w));
     auto y = (area.y + (i / area.w));
     pos = y * area.w + x;
-    if (dep.depth > depth[pos] and depth[pos] > 0.0 and
+    if (dep.z > depth[pos] and depth[pos] > 0.0 and
         !std::isnan(depth[pos]))
     {
-      dep.depth = fabs(depth[pos]);
-      dep.pixel_x = x;
-      dep.pixel_y = y * area.w;
+      dep.z= fabs(depth[pos]);
+      dep.x= x;
+      dep.y= y * area.w;
     }
   }
-  dep.depth = dep.depth / ms_to_s; // convert to cm
+  dep.z= dep.z/ mm_to_cm; // convert to cm
   return dep;
 }
