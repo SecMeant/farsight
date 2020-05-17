@@ -4,7 +4,7 @@
 #include <cmath>
 #include <fmt/format.h>
 #include <memory>
-
+using pointArray = std::vector<cv::Point2f>;
 class detector
 {
 public:
@@ -21,7 +21,7 @@ public:
   void
   setConfig(int kinectID,
             const objectType t,
-            const cv::Mat &img,
+            const cv::Mat &imgDepth,
             const bbox &a,
             const position &p);
   void

@@ -18,6 +18,18 @@ struct kinect
   releaseFrames();
   void
   close();
+  
+  libfreenect2::Freenect2Device::IrCameraParams
+  getIRParams()
+  {
+    return dev->getIrCameraParams();
+  }
+
+  libfreenect2::Freenect2Device::ColorCameraParams
+  getColorParams()
+  {
+    return dev->getColorCameraParams();
+  }
 
   bool isActive = false;
 

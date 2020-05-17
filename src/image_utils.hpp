@@ -12,7 +12,7 @@ using byte = unsigned char;
 
 struct position
 {
-    double x, y, z;
+    float x, y, z;
 };
 
 struct bbox
