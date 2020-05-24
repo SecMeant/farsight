@@ -31,7 +31,8 @@ public:
                  const libfreenect2::Frame *frame);
   void 
   setBaseImg(int kinectID, const cv::Mat &img);
-
+  void
+  calcBiggestComponent();
   void
   meassure();
   void

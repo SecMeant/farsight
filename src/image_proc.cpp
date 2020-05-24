@@ -113,9 +113,21 @@ detector::calcReferenceOffsset(objectType t)
 }
 
 void
-calcBiggestComponent()
+detector::calcBiggestComponent()
 {
+  auto &c1 =config[0].objects[to_underlying(objectType::MEASURED_OBJ)];
+  auto &c2 =config[1].objects[to_underlying(objectType::MEASURED_OBJ)];
+  if(!(c1.configured && c2.configured))
+    return;
 
+  pointArray pointsCloud(c1.flattenedObject); 
+  // translate second camera points based on reference objects 
+  for(const auto &p : c2.flattenedObject)
+  {
+    pointsCloud.emplace_back(p.x-cameraOffsets.x, p.y); // need to do sth wit z axies
+  }
+
+  cv::minAreaRect(pointsCloud);
 }
 
 void
