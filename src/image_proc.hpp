@@ -22,6 +22,7 @@ public:
             const objectType t,
             const cv::Mat &imgDepth,
             const bbox &a,
+            const bbox &ra,
             const position &p,
             const pointArray &flattened);
   void
@@ -35,6 +36,8 @@ public:
   meassure();
   void
   displayCurrectConfig();
+  void
+  calcReferenceOffsset(objectType t);
 
   const byte *
   getDepthFrame(int kinectID, objectType t)
@@ -52,7 +55,7 @@ private:
   std::array<cameraConfig, maxKinectCount> config;
   cv::Mat configScreen;
   cv::Rect matRoi;
-
+  position cameraOffsets;
   void
   presentResults();
 };

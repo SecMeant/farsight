@@ -9,7 +9,7 @@
 #include <opencv2/photo.hpp>
 
 using byte = unsigned char;
-
+constexpr float M_TO_MM = 1000.0;
 struct position
 {
     float x, y, z;

@@ -20,7 +20,6 @@ detector::detect(int kinectID,
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
-  bool clr = false;
 
   std::array<byte, depth_width * depth_height> frame_depth_;
   std::copy(frameObject,
@@ -41,7 +40,6 @@ detector::detect(int kinectID,
   cv::connectedComponentsWithStats(
     image_depth_filtered, labels, stats, centroids);
 
-  clr = !clr;
   bbox best_bbox;
 
   for (int i = 0; i < stats.rows; ++i)
@@ -71,7 +69,7 @@ detector::detect(int kinectID,
              best_bbox.w,
              best_bbox.h,
              best_bbox.area);
-  cv::Scalar color(clr ? 255 : 0, 0, 0);
+  cv::Scalar color(0, 0, 0);
   cv::Rect rect(best_bbox.x, best_bbox.y, best_bbox.w, best_bbox.h);
   cv::rectangle(imageDepth, rect, color, 3);
   return best_bbox;
@@ -79,20 +77,42 @@ detector::detect(int kinectID,
 
 void
 detector::setConfig(int kinectID,
-                    const objectType t,
+                    objectType t,
                     const cv::Mat &img,
                     const bbox &a,
+                    const bbox &ra,
                     const position &p,
                     const pointArray &flattened)
 {
   auto &c =config[kinectID].objects[to_underlying(t)];
   c.area = a;
+  c.realArea = ra;
   c.nearest_point = p;
   img.copyTo(c.imgDepth);
   c.flattenedObject = flattened;
-  c.configured= true;
+  c.configured = true;
 }
-void 
+
+void
+detector::calcReferenceOffsset(objectType t)
+{
+  auto &c1 =config[0].objects[to_underlying(t)];
+  auto &c2 =config[1].objects[to_underlying(t)];
+  if(!(c1.configured && c2.configured))
+    return;
+
+  int span_x = (double(c1.realArea.w)/c1.area.w)*depth_width;
+  int off_1, off_2;
+  off_1 = c1.realArea.x;
+  // since second camer has reflected image of first camera
+  // we need to take second vertex and substract it from max width
+  off_2 = span_x - (c2.realArea.x + c2.realArea.w);
+  cameraOffsets.x = off_1 - off_2; 
+  cameraOffsets.y = c1.realArea.y - c2.realArea.y;
+  cameraOffsets.z = c1.nearest_point.z + c2.nearest_point.z + 500;
+}
+
+void
 calcBiggestComponent()
 {
 
@@ -107,70 +127,70 @@ detector::displayCurrectConfig()
   const auto &c2_m = config[1].objects[to_underlying(objectType::MEASURED_OBJ)];
   cv::Mat temp;
 
-    matRoi = cv::Rect(0, 0, depth_width, depth_height);
-    resize(c1_r.imgDepth, temp, cv::Size(depth_width, depth_height));
-    cv::putText(temp,
-                "c1 base",
-                { 50, 50 },
-                cv::FONT_HERSHEY_PLAIN,
-                2,
-                cv::Scalar::all(255),
-                3,
-                5);
-    temp.copyTo(configScreen(matRoi));
+  matRoi = cv::Rect(0, 0, depth_width, depth_height);
+  resize(c1_r.imgDepth, temp, cv::Size(depth_width, depth_height));
+  cv::putText(temp,
+              "c1 base",
+              { 50, 50 },
+              cv::FONT_HERSHEY_PLAIN,
+              2,
+              cv::Scalar::all(255),
+              3,
+              5);
+  temp.copyTo(configScreen(matRoi));
 
-    matRoi = cv::Rect(depth_width, 0, depth_width, depth_height);
-    resize(c1_m.imgDepth, temp, cv::Size(depth_width, depth_height));
-    cv::putText(temp,
-                fmt::format("object {}x{} pixels ", c1_m.area.w, c1_m.area.h),
-                { depth_width / 10, 50 },
-                cv::FONT_HERSHEY_PLAIN,
-                2,
-                cv::Scalar::all(255),
-                3,
-                5);
-    cv::putText(temp,
-                fmt::format("object depth {} cm ", c2_r.nearest_point.z),
-                { depth_width / 10, 100 },
-                cv::FONT_HERSHEY_PLAIN,
-                2,
-                cv::Scalar::all(255),
-                3,
-                5);
-    temp.copyTo(configScreen(matRoi));
+  matRoi = cv::Rect(depth_width, 0, depth_width, depth_height);
+  resize(c1_m.imgDepth, temp, cv::Size(depth_width, depth_height));
+  cv::putText(temp,
+              fmt::format("object {}x{} pixels ", c1_m.area.w, c1_m.area.h),
+              { depth_width / 10, 50 },
+              cv::FONT_HERSHEY_PLAIN,
+              2,
+              cv::Scalar::all(255),
+              3,
+              5);
+  cv::putText(temp,
+              fmt::format("object depth {} cm ", c2_r.nearest_point.z),
+              { depth_width / 10, 100 },
+              cv::FONT_HERSHEY_PLAIN,
+              2,
+              cv::Scalar::all(255),
+              3,
+              5);
+  temp.copyTo(configScreen(matRoi));
 
-    matRoi = cv::Rect(0, depth_height, depth_width, depth_height);
-    resize(c2_r.imgDepth, temp, cv::Size(depth_width, depth_height));
-    cv::putText(temp,
-                "c2 base",
-                { 50, depth_height / 10 },
-                cv::FONT_HERSHEY_PLAIN,
-                2,
-                cv::Scalar::all(255),
-                3,
-                5);
-    temp.copyTo(configScreen(matRoi));
+  matRoi = cv::Rect(0, depth_height, depth_width, depth_height);
+  resize(c2_r.imgDepth, temp, cv::Size(depth_width, depth_height));
+  cv::putText(temp,
+              "c2 base",
+              { 50, depth_height / 10 },
+              cv::FONT_HERSHEY_PLAIN,
+              2,
+              cv::Scalar::all(255),
+              3,
+              5);
+  temp.copyTo(configScreen(matRoi));
 
-    matRoi =
-      cv::Rect(depth_width, depth_height, depth_width, depth_height);
-    resize(c2_m.imgDepth, temp, cv::Size(depth_width, depth_height));
-    cv::putText(temp,
-                fmt::format("object {}x{} pixels ", c2_m.area.w, c2_m.area.h),
-                { depth_width / 10, depth_height / 10 },
-                cv::FONT_HERSHEY_PLAIN,
-                2,
-                cv::Scalar::all(255),
-                3,
-                5);
-    cv::putText(temp,
-                fmt::format("object depth {} cm ", c2_m.nearest_point.z),
-                { depth_width / 10, 100 },
-                cv::FONT_HERSHEY_PLAIN,
-                2,
-                cv::Scalar::all(255),
-                3,
-                5);
-    temp.copyTo(configScreen(matRoi));
+  matRoi =
+    cv::Rect(depth_width, depth_height, depth_width, depth_height);
+  resize(c2_m.imgDepth, temp, cv::Size(depth_width, depth_height));
+  cv::putText(temp,
+              fmt::format("object {}x{} pixels ", c2_m.area.w, c2_m.area.h),
+              { depth_width / 10, depth_height / 10 },
+              cv::FONT_HERSHEY_PLAIN,
+              2,
+              cv::Scalar::all(255),
+              3,
+              5);
+  cv::putText(temp,
+              fmt::format("object depth {} cm ", c2_m.nearest_point.z),
+              { depth_width / 10, 100 },
+              cv::FONT_HERSHEY_PLAIN,
+              2,
+              cv::Scalar::all(255),
+              3,
+              5);
+  temp.copyTo(configScreen(matRoi));
 
   cv::imshow("config", configScreen);
 }

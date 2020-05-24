@@ -36,7 +36,7 @@ sigint_handler(int signo)
 }
 
 pointArray 
-createPointMaping(libfreenect2::Registration& reg, libfreenect2::Frame *f, bbox b)
+createPointMaping(const libfreenect2::Registration &reg, const libfreenect2::Frame *f,const bbox &b)
 {
  position p;
  pointArray  map;
@@ -50,6 +50,20 @@ createPointMaping(libfreenect2::Registration& reg, libfreenect2::Frame *f, bbox 
    }
  }
  return map;
+}
+
+bbox
+getRealArea(const libfreenect2::Registration& reg, const libfreenect2::Frame *f,const bbox &b)
+{
+  bbox ra;
+  position p;
+  reg.getPointXYZ(f, b.y, b.x, p.x, p.y, p.z);
+  ra.x = p.x*M_TO_MM;
+  ra.y = p.y*M_TO_MM;
+  reg.getPointXYZ(f, b.y + b.h, b.x + b.w, p.x, p.y, p.z);
+  ra.w = p.x*M_TO_MM - ra.x;
+  ra.h = p.y*M_TO_MM - ra.y;
+  return ra;
 }
 
 int
@@ -133,7 +147,9 @@ main(int argc, char **argv)
           boxAverage.reset();
           avg_number = 0;
           auto flattenedObject = createPointMaping(reg,undistorted,detectedBox);
-          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, nearestPoint, flattenedObject);
+          auto realArea = getRealArea(reg,undistorted,detectedBox);
+          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, realArea, nearestPoint, flattenedObject);
+          dec.calcReferenceOffsset(t);
           dec.displayCurrectConfig();
         }
         break;

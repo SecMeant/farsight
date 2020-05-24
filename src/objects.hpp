@@ -18,6 +18,7 @@ constexpr auto to_underlying(E e) noexcept
 struct object_t
 {
     bbox area;
+    bbox realArea;
     position nearest_point;
     cv::Mat imgDepth = cv::Mat::zeros(
         cv::Size(depth_width, depth_height), CV_8UC1); 
@@ -32,7 +33,8 @@ using objectArray = std::array<object_t, objectsPerCamera>;
 
 struct cameraConfig
 {
-    position selfPosition;
+    position camPose;
     cv::Mat img_base;
     objectArray objects;
+    int camSpan;
 };
