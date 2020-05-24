@@ -20,9 +20,9 @@ find_package(fmt REQUIRED)
 file(GLOB CXX_SRC src/*.cc src/*.cpp)
 
 if (BUILD_EXPERIMENTS)
-	add_executable(e1 expr/e1.cc)
-	target_link_libraries(e1 ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
-	add_custom_command(TARGET e1 POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/media ${CMAKE_BINARY_DIR}/media)
+	add_executable(aruco expr/aruco.cc)
+	target_link_libraries(aruco ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
+	add_custom_command(TARGET aruco POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/media ${CMAKE_BINARY_DIR}/media)
 endif()
 
 add_executable(test ${CXX_SRC})

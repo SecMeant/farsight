@@ -74,6 +74,7 @@ main(int argc, char **argv)
   libfreenect2::Frame *undistorted, *registered;
   libfreenect2::Registration reg(k_dev.getIRParams(),
                                  k_dev.getColorParams());
+  objectType t;
   while (continue_flag.test_and_set() and c != 'q')
   {
     k_dev.waitForFrames(10);
@@ -82,10 +83,12 @@ main(int argc, char **argv)
     libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
     if (c == 'r')
     {
+      t=objectType::REFERENCE_OBJ;
       reg.apply(rgb, depth, undistorted, registered);
       dec.saveDepthFrame(selectedKinnect, objectType::REFERENCE_OBJ, undistorted);
     }else if(c == 'o')
     {
+      t=objectType::MEASURED_OBJ;
       reg.apply(rgb, depth, undistorted, registered);
       dec.saveDepthFrame(selectedKinnect, objectType::MEASURED_OBJ, undistorted);
     }
@@ -106,13 +109,12 @@ main(int argc, char **argv)
         dec.displayCurrectConfig();
       }
       break;
-      case 'c':
-        break;
       case 'r':
+      case 'o': // find object depth
         {
           auto detectedBox = dec.detect(
             selectedKinnect, depth->data, total_size_depth, image_depth);
-          auto *frameDepth = dec.getDepthFrame(selectedKinnect, objectType::REFERENCE_OBJ);
+          auto *frameDepth = dec.getDepthFrame(selectedKinnect, t);
           auto nearestPoint = findNearestPoint<float>(
             detectedBox, frameDepth);
           boxAverage += detectedBox;
@@ -130,37 +132,11 @@ main(int argc, char **argv)
           nearestPointAvg.z= 0;
           boxAverage.reset();
           avg_number = 0;
-          auto points = createPointMaping(reg,undistorted,detectedBox);
-          dec.setConfig(selectedKinnect, objectType::REFERENCE_OBJ, image_depth, detectedBox, nearestPoint);
+          auto flattenedObject = createPointMaping(reg,undistorted,detectedBox);
+          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, nearestPoint, flattenedObject);
           dec.displayCurrectConfig();
         }
         break;
-      case 'o': // find object depth
-      {
-        auto detectedBox = dec.detect(
-          selectedKinnect, depth->data, total_size_depth, image_depth);
-        auto nearestPoint = findNearestPoint<float>(
-          detectedBox, dec.getDepthFrame(selectedKinnect,objectType::MEASURED_OBJ));
-        boxAverage += detectedBox;
-        nearestPointAvg.z += nearestPoint.z;
-
-        if (avg_number < avg_max_number)
-        {
-          avg_number++;
-          k_dev.releaseFrames();
-          continue;
-        }
-        nearestPoint.z= nearestPointAvg.z/ avg_max_number;
-        detectedBox.w = boxAverage.w / avg_max_number;
-        detectedBox.y = boxAverage.h / avg_max_number;
-        nearestPointAvg.z= 0;
-        boxAverage.reset();
-        avg_number = 0; // 1?
-        auto points = createPointMaping(reg,undistorted,detectedBox);
-        dec.setConfig(selectedKinnect, objectType::MEASURED_OBJ, image_depth, detectedBox, nearestPoint);
-        dec.displayCurrectConfig();
-      }
-      break;
       case '1':
         selectedKinnect = 0;
         k_dev.open(selectedKinnect);

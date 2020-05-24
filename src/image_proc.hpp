@@ -4,7 +4,6 @@
 #include <cmath>
 #include <fmt/format.h>
 #include <memory>
-using pointArray = std::vector<cv::Point2f>;
 class detector
 {
 public:
@@ -23,7 +22,8 @@ public:
             const objectType t,
             const cv::Mat &imgDepth,
             const bbox &a,
-            const position &p);
+            const position &p,
+            const pointArray &flattened);
   void
   saveDepthFrame(int kinectID,
                  const objectType t,

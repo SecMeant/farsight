@@ -82,12 +82,20 @@ detector::setConfig(int kinectID,
                     const objectType t,
                     const cv::Mat &img,
                     const bbox &a,
-                    const position &p)
+                    const position &p,
+                    const pointArray &flattened)
 {
   auto &c =config[kinectID].objects[to_underlying(t)];
   c.area = a;
   c.nearest_point = p;
   img.copyTo(c.imgDepth);
+  c.flattenedObject = flattened;
+  c.configured= true;
+}
+void 
+calcBiggestComponent()
+{
+
 }
 
 void

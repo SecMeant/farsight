@@ -2,6 +2,7 @@
 #include "image_utils.hpp"
 #include "config.hpp"
 #include <type_traits>
+using pointArray = std::vector<cv::Point2f>;
 
 enum class objectType : unsigned int
 {
@@ -22,6 +23,8 @@ struct object_t
         cv::Size(depth_width, depth_height), CV_8UC1); 
     std::unique_ptr<byte[]> depthFrame =
       std::make_unique<byte[]>(total_size_depth);
+    pointArray flattenedObject;
+    bool configured=false;
 };
 
 constexpr int objectsPerCamera = 2;
