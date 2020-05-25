@@ -14,7 +14,7 @@ public:
 
   bbox
   detect(int kinectID,
-         const byte *frame_object,
+         byte *frame_object,
          size_t size,
          cv::Mat &image_depth);
   void
@@ -22,8 +22,7 @@ public:
             const objectType t,
             const cv::Mat &imgDepth,
             const bbox &a,
-            const bbox &ra,
-            const position &p,
+            const cv::Point3f &p,
             const pointArray &flattened);
   void
   saveDepthFrame(int kinectID,
@@ -38,7 +37,7 @@ public:
   void
   displayCurrectConfig();
   void
-  calcReferenceOffsset(objectType t);
+  translate(objectType t);
 
   const byte *
   getDepthFrame(int kinectID, objectType t)
@@ -56,7 +55,6 @@ private:
   std::array<cameraConfig, maxKinectCount> config;
   cv::Mat configScreen;
   cv::Rect matRoi;
-  position cameraOffsets;
-  void
-  presentResults();
+  cv::Point3f cameraOffsets;
+  pointArray map_;
 };

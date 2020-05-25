@@ -10,10 +10,7 @@
 
 using byte = unsigned char;
 constexpr float M_TO_MM = 1000.0;
-struct position
-{
-    float x, y, z;
-};
+constexpr float FRAME_CORPURTED = 255.0;
 
 struct bbox
 {
@@ -53,11 +50,11 @@ depthProcess(libfreenect2::Frame *frame);
 
 // byte, short, int, float ...
 template<typename Format>
-position
-findNearestPoint(const bbox &area, const byte *frame)
+cv::Point3f
+findNearestPoint(const bbox &area, const byte *frame, const byte *filtered)
 {
   constexpr int mm_to_cm = 10;
-  position dep;
+  cv::Point3f dep;
   int pos = area.y * area.w + area.x;
   const auto *depth = reinterpret_cast<const Format *>(frame);
 
@@ -66,14 +63,15 @@ findNearestPoint(const bbox &area, const byte *frame)
     auto x = (area.x + (i % area.w));
     auto y = (area.y + (i / area.w));
     pos = y * area.w + x;
+
     if (dep.z > depth[pos] and depth[pos] > 0.0 and
-        !std::isnan(depth[pos]))
+        !std::isnan(depth[pos]) and filtered[pos] != 255)
     {
       dep.z= fabs(depth[pos]);
       dep.x= x;
       dep.y= y * area.w;
     }
   }
-  dep.z= dep.z/ mm_to_cm; // convert to cm
+  dep.z= dep.z;
   return dep;
 }

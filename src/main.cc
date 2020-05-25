@@ -1,6 +1,7 @@
 #include <cmath>
 #include <memory>
 #include <stdio.h>
+#include <limits>
 
 #include "image_proc.hpp"
 #include "kinect_manager.hpp"
@@ -35,35 +36,30 @@ sigint_handler(int signo)
   }
 }
 
+// return array of points with mapped 
+// the real x y z coordinates in milimiters
 pointArray 
-createPointMaping(const libfreenect2::Registration &reg, const libfreenect2::Frame *f,const bbox &b)
+createPointMaping(const libfreenect2::Registration &reg,
+                  const libfreenect2::Frame *f,
+                  const byte *filtered,
+                  const bbox &b)
 {
- position p;
- pointArray  map;
- 
+ Point3f p;
+ pointArray map;
+ int pos;
  for(int r=b.y; r < b.y+b.h; r++)
  {
    for(int c=b.x; c < b.x+b.w; c++)
    {
+    pos = r*b.w + c;
+    if(filtered[pos] == 255)
+      continue;
+
     reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-    map.emplace_back(p.x, p.z);
+    map.emplace_back(p.x*M_TO_MM, p.y*M_TO_MM, p.z*M_TO_MM);
    }
  }
  return map;
-}
-
-bbox
-getRealArea(const libfreenect2::Registration& reg, const libfreenect2::Frame *f,const bbox &b)
-{
-  bbox ra;
-  position p;
-  reg.getPointXYZ(f, b.y, b.x, p.x, p.y, p.z);
-  ra.x = p.x*M_TO_MM;
-  ra.y = p.y*M_TO_MM;
-  reg.getPointXYZ(f, b.y + b.h, b.x + b.w, p.x, p.y, p.z);
-  ra.w = p.x*M_TO_MM - ra.x;
-  ra.h = p.y*M_TO_MM - ra.y;
-  return ra;
 }
 
 int
@@ -77,7 +73,7 @@ main(int argc, char **argv)
   }
   int c = 0;
   bbox boxAverage;
-  position nearestPointAvg;
+  Point3f nearestPointAvg;
   nearestPointAvg.z= 0;
 
   int avg_number = 0; // 1?
@@ -97,14 +93,14 @@ main(int argc, char **argv)
     libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
     if (c == 'r')
     {
-      t=objectType::REFERENCE_OBJ;
+      t = objectType::REFERENCE_OBJ;
       reg.apply(rgb, depth, undistorted, registered);
-      dec.saveDepthFrame(selectedKinnect, objectType::REFERENCE_OBJ, undistorted);
+      dec.saveDepthFrame(selectedKinnect, t, undistorted);
     }else if(c == 'o')
     {
-      t=objectType::MEASURED_OBJ;
+      t = objectType::MEASURED_OBJ;
       reg.apply(rgb, depth, undistorted, registered);
-      dec.saveDepthFrame(selectedKinnect, objectType::MEASURED_OBJ, undistorted);
+      dec.saveDepthFrame(selectedKinnect, t, undistorted);
     }
 
     depthProcess(depth);
@@ -130,7 +126,7 @@ main(int argc, char **argv)
             selectedKinnect, depth->data, total_size_depth, image_depth);
           auto *frameDepth = dec.getDepthFrame(selectedKinnect, t);
           auto nearestPoint = findNearestPoint<float>(
-            detectedBox, frameDepth);
+            detectedBox, frameDepth, depth->data);
           boxAverage += detectedBox;
           nearestPointAvg.z += nearestPoint.z;
 
@@ -140,16 +136,15 @@ main(int argc, char **argv)
             k_dev.releaseFrames();
             continue;
           }
-          nearestPoint.z= nearestPointAvg.z/ avg_max_number;
+          nearestPoint.z = nearestPointAvg.z / avg_max_number;
           detectedBox.w = boxAverage.w / avg_max_number;
           detectedBox.y = boxAverage.h / avg_max_number;
           nearestPointAvg.z= 0;
           boxAverage.reset();
           avg_number = 0;
-          auto flattenedObject = createPointMaping(reg,undistorted,detectedBox);
-          auto realArea = getRealArea(reg,undistorted,detectedBox);
-          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, realArea, nearestPoint, flattenedObject);
-          dec.calcReferenceOffsset(t);
+          auto realPoints = createPointMaping(reg, undistorted, depth->data, detectedBox);
+          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, nearestPoint, realPoints);
+          dec.translate(t);
           dec.displayCurrectConfig();
         }
         break;
@@ -161,16 +156,6 @@ main(int argc, char **argv)
         selectedKinnect = 1;
         k_dev.open(selectedKinnect);
         break;
-    }
-
-    if (dec.isConfigured())
-    {
-      // remove points which are still visible and are in detected
-      // rectangle
-
-      // collect data set and detect smallest rectangle based on points,
-
-      // draw smallest dimensions
     }
 
     cv::imshow(wndname, image_rgb);

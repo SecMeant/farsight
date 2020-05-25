@@ -2,7 +2,8 @@
 #include "image_utils.hpp"
 #include "config.hpp"
 #include <type_traits>
-using pointArray = std::vector<cv::Point2f>;
+#include <opencv2/core/types.hpp>
+using pointArray = std::vector<cv::Point3f>;
 
 enum class objectType : unsigned int
 {
@@ -18,13 +19,12 @@ constexpr auto to_underlying(E e) noexcept
 struct object_t
 {
     bbox area;
-    bbox realArea;
-    position nearest_point;
+    cv::Point3f nearest_point;
     cv::Mat imgDepth = cv::Mat::zeros(
         cv::Size(depth_width, depth_height), CV_8UC1); 
     std::unique_ptr<byte[]> depthFrame =
       std::make_unique<byte[]>(total_size_depth);
-    pointArray flattenedObject;
+    pointArray pointCloud;
     bool configured=false;
 };
 
@@ -33,7 +33,7 @@ using objectArray = std::array<object_t, objectsPerCamera>;
 
 struct cameraConfig
 {
-    position camPose;
+    cv::Point3f camPose;
     cv::Mat img_base;
     objectArray objects;
     int camSpan;

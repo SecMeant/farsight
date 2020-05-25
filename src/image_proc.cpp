@@ -14,23 +14,18 @@ detector::detector()
 }
 bbox
 detector::detect(int kinectID,
-                 const byte *frameObject,
+                 byte *frameObject,
                  size_t size,
                  cv::Mat &imageDepth)
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
 
-  std::array<byte, depth_width * depth_height> frame_depth_;
-  std::copy(frameObject,
-            frameObject + depth_width * depth_height,
-            frame_depth_.data());
-
-  diff(frame_depth_.data(),
+  diff(frameObject,
        config[kinectID].img_base.ptr(),
        size);
   auto image_depth_ =
-    cv::Mat(depth_height, depth_width, CV_8UC1, frame_depth_.data());
+    cv::Mat(depth_height, depth_width, CV_8UC1, frameObject);
   cv::Mat image_depth_th, image_depth_filtered;
   cv::threshold(
     image_depth_, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
@@ -80,36 +75,27 @@ detector::setConfig(int kinectID,
                     objectType t,
                     const cv::Mat &img,
                     const bbox &a,
-                    const bbox &ra,
-                    const position &p,
-                    const pointArray &flattened)
+                    const cv::Point3f &p,
+                    const pointArray &pointCloud)
 {
   auto &c =config[kinectID].objects[to_underlying(t)];
   c.area = a;
-  c.realArea = ra;
   c.nearest_point = p;
   img.copyTo(c.imgDepth);
-  c.flattenedObject = flattened;
+  c.pointCloud = pointCloud;
   c.configured = true;
 }
 
 void
-detector::calcReferenceOffsset(objectType t)
+detector::translate(objectType t)
 {
+  pointArray map;
   auto &c1 =config[0].objects[to_underlying(t)];
   auto &c2 =config[1].objects[to_underlying(t)];
   if(!(c1.configured && c2.configured))
     return;
 
-  int span_x = (double(c1.realArea.w)/c1.area.w)*depth_width;
-  int off_1, off_2;
-  off_1 = c1.realArea.x;
-  // since second camer has reflected image of first camera
-  // we need to take second vertex and substract it from max width
-  off_2 = span_x - (c2.realArea.x + c2.realArea.w);
-  cameraOffsets.x = off_1 - off_2; 
-  cameraOffsets.y = c1.realArea.y - c2.realArea.y;
-  cameraOffsets.z = c1.nearest_point.z + c2.nearest_point.z + 500;
+  map_ = map;
 }
 
 void
@@ -120,14 +106,20 @@ detector::calcBiggestComponent()
   if(!(c1.configured && c2.configured))
     return;
 
-  pointArray pointsCloud(c1.flattenedObject); 
-  // translate second camera points based on reference objects 
-  for(const auto &p : c2.flattenedObject)
+  std::vector<cv::Point2f> pointsCloudTop;
+  std::vector<cv::Point2f> pointsCloudFront;
+  for(auto &p :map_)
   {
-    pointsCloud.emplace_back(p.x-cameraOffsets.x, p.y); // need to do sth wit z axies
+    pointsCloudTop.emplace_back(p.x, p.z);
+    pointsCloudFront.emplace_back(p.x, p.y);
   }
+  auto rectTop = cv::minAreaRect(pointsCloudTop);
+  auto rectFront = cv::minAreaRect(pointsCloudFront);
+  auto obj_width = rectTop.size.width;
+  auto obj_height = rectFront.size.height;
+  auto obj_length = rectTop.size.height;
 
-  cv::minAreaRect(pointsCloud);
+  fmt::print("{} {} {}", obj_width, obj_height, obj_length);
 }
 
 void
