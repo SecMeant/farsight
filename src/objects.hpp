@@ -2,6 +2,7 @@
 #include "image_utils.hpp"
 #include "config.hpp"
 #include <type_traits>
+#include <memory>
 #include <opencv2/core/types.hpp>
 using pointArray = std::vector<cv::Point3f>;
 
