@@ -92,10 +92,19 @@ detector::translate(objectType t)
   pointArray map;
   auto &c1 =config[0].objects[to_underlying(t)];
   auto &c2 =config[1].objects[to_underlying(t)];
-  if(!(c1.configured && c2.configured))
-    return;
+  // just for debug
+  //if(!(c1.configured && c2.configured))
+   // return;
+  for (const auto &p : c1.pointCloud)
+  {
+    map.push_back(p);
+  }
 
-  map_ = map;
+  for (const auto &p : c2.pointCloud)
+  {
+    map.push_back(p);
+  }
+  map_ = std::move(map);
 }
 
 void
@@ -103,8 +112,8 @@ detector::calcBiggestComponent()
 {
   auto &c1 =config[0].objects[to_underlying(objectType::MEASURED_OBJ)];
   auto &c2 =config[1].objects[to_underlying(objectType::MEASURED_OBJ)];
-  if(!(c1.configured && c2.configured))
-    return;
+  //if(!(c1.configured && c2.configured))
+   // return;
 
   std::vector<cv::Point2f> pointsCloudTop;
   std::vector<cv::Point2f> pointsCloudFront;

@@ -19,7 +19,7 @@ const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
 
-constexpr int avg_max_number = 100;
+constexpr int avg_max_number = 10;
 std::atomic_flag continue_flag;
 
 using namespace cv;
@@ -34,6 +34,22 @@ sigint_handler(int signo)
     fmt::print("Got SIGINT\n");
     continue_flag.clear();
   }
+}
+
+void saveFrameToFile(const libfreenect2::Registration &reg,
+                     const libfreenect2::Frame *f)
+{
+ Point3f p;
+ auto *file = fopen("frame_decded", "w");
+ for(int r=0; r < f->height; r++)
+ {
+   for(int c=0; c < f->width; c++)
+   {
+    reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
+    fprintf(file, "%f %f %f\n", p.x, p.y, p.z);
+   }
+ }
+ fclose(file);
 }
 
 // return array of points with mapped 
@@ -139,6 +155,7 @@ main(int argc, char **argv)
           nearestPoint.z = nearestPointAvg.z / avg_max_number;
           detectedBox.w = boxAverage.w / avg_max_number;
           detectedBox.y = boxAverage.h / avg_max_number;
+          saveFrameToFile(reg, undistorted);
           nearestPointAvg.z= 0;
           boxAverage.reset();
           avg_number = 0;
@@ -146,6 +163,7 @@ main(int argc, char **argv)
           dec.setConfig(selectedKinnect, t, image_depth, detectedBox, nearestPoint, realPoints);
           dec.translate(t);
           dec.displayCurrectConfig();
+          dec.calcBiggestComponent();
         }
         break;
       case '1':
