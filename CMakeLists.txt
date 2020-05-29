@@ -21,7 +21,9 @@ file(GLOB CXX_SRC src/*.cc src/*.cpp)
 
 if (BUILD_EXPERIMENTS)
 	add_executable(aruco expr/aruco.cc)
+	add_executable(aruco_dump expr/aruco_dump.cc)
 	target_link_libraries(aruco ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
+	target_link_libraries(aruco_dump ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
 	add_custom_command(TARGET aruco POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/media ${CMAKE_BINARY_DIR}/media)
 endif()
 
