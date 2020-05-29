@@ -215,7 +215,7 @@ detector::saveDepthFrame(int kinectID,
 {
   auto &c = config[kinectID].objects[to_underlying(t)];
   std::copy(frame->data,
-            frame->data + total_size_depth*sizeof(float),
+            frame->data + total_size_depth,
             c.depthFrame.get());
 }
 
