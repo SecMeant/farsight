@@ -48,8 +48,19 @@ static GLfloat scale = 1;
 static GLfloat offset_x = 0;
 static GLfloat offset_y = 0;
 
-float data_x, data_y, data_width;
-std::vector<float> points;
+struct Point3f
+{
+  float x,y,z;
+};
+
+struct DataHeader
+{
+  float width, camera_pos[3], camera_rot[9];
+};
+
+DataHeader data_header;
+
+std::vector<Point3f> points;
 
 static void
 Axes(void)
@@ -102,36 +113,39 @@ matrix_at(const float *mat, size_t x, size_t y, size_t w)
   return pixel_ptr;
 }
 
-static void
-drawpoints(const std::vector<float> &v)
+static Point3f
+matrix_point_at(const Point3f *mat, size_t x, size_t y, size_t w)
 {
-  auto x = 0; // data_x;
-  auto y = 0; // data_y;
-  auto w = static_cast<size_t>(data_width);
+  auto offset = x + y * w;
+  return *(reinterpret_cast<const Point3f *>(mat) + offset);
+}
+
+static void
+drawpoints(const std::vector<Point3f> &v)
+{
+  auto w = static_cast<size_t>(data_header.width);
   size_t i = 0;
   size_t j = 0;
-  constexpr float scale_factor_depth = 4.0f;
-  constexpr float scale_factor_width = 12.0f;
-  constexpr float scale_factor_height = 12.0f;
-  const float *data = v.data();
+  constexpr float scale_factor_depth = 1.0f;
+  constexpr float scale_factor_width = 1.0f;
+  constexpr float scale_factor_height = 1.0f;
   size_t h = v.size() / w;
 
   glBegin(GL_POINTS);
   glColor3f(1.0f, 1.0f, 1.0f);
 
-  auto cutoff = 0ul;
-
-  for (size_t j = 0; j < h - 1 - cutoff; ++j)
-    for (size_t i = cutoff; i < w - 1 - cutoff; ++i)
+  for (size_t j = 0; j < h - 1; ++j)
+    for (size_t i = 0; i < w - 1; ++i)
     {
-      auto depth = *matrix_at(data, i, h - 1 - cutoff - j, w);
+      auto p = matrix_point_at(v.data(), i, j, w);
 
-      if (depth == 255.0f)
+      if (std::isnan(p.z))
         continue;
 
-      glVertex3f((x + i) / scale_factor_width,
-                 (y + j) / scale_factor_height,
-                 depth / scale_factor_depth);
+      float x = p.x * scale_factor_width, y = -(p.y * scale_factor_height),
+            z = p.z * scale_factor_depth;
+
+      glVertex3f(x,y,z);
     }
 
   glEnd();
@@ -234,7 +248,7 @@ Motion(GLsizei x, GLsizei y)
 static void
 Keyboard(unsigned char key, int x, int y)
 {
-  constexpr double camera_speed = 1.0f;
+  constexpr double camera_speed = 0.5f;
 
   switch (key)
   {
@@ -350,7 +364,6 @@ main(int argc, char **argv)
     return 3;
   }
 
-  float data_header[3];
   if (read_all(fd, &data_header, sizeof(data_header)))
   {
     close(fd);
@@ -359,7 +372,7 @@ main(int argc, char **argv)
   }
 
   auto raw_data_size = fstats.st_size - sizeof(data_header);
-  auto data_count = raw_data_size / sizeof(float);
+  auto data_count = raw_data_size / sizeof(Point3f);
 
   points.resize(data_count);
   char *output = reinterpret_cast<char *>(points.data());
@@ -373,9 +386,26 @@ main(int argc, char **argv)
 
   close(fd);
 
-  data_x = data_header[0];
-  data_y = data_header[1];
-  data_width = data_header[2];
+  fmt::print("Info:\n"
+             "WIDTH: {}\n"
+             "CAM POS: {} {} {}\n"
+             "CAM ROT:\n"
+             "\t{} {} {}\n"
+             "\t{} {} {}\n"
+             "\t{} {} {}\n",
+             data_header.width,
+             data_header.camera_pos[0],
+             data_header.camera_pos[1],
+             data_header.camera_pos[2],
+             data_header.camera_rot[0],
+             data_header.camera_rot[1],
+             data_header.camera_rot[2],
+             data_header.camera_rot[3],
+             data_header.camera_rot[4],
+             data_header.camera_rot[5],
+             data_header.camera_rot[6],
+             data_header.camera_rot[7],
+             data_header.camera_rot[8]);
 
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
