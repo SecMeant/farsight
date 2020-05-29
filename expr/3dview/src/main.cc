@@ -110,7 +110,9 @@ drawpoints(const std::vector<float> &v)
   auto w = static_cast<size_t>(data_width);
   size_t i = 0;
   size_t j = 0;
-  constexpr float scale_factor = 4.0f;
+  constexpr float scale_factor_depth = 4.0f;
+  constexpr float scale_factor_width = 12.0f;
+  constexpr float scale_factor_height = 12.0f;
   const float *data = v.data();
   size_t h = v.size() / w;
 
@@ -127,9 +129,9 @@ drawpoints(const std::vector<float> &v)
       if (depth == 255.0f)
         continue;
 
-      glVertex3f((x + i) / scale_factor,
-                 (y + j) / scale_factor,
-                 depth / scale_factor);
+      glVertex3f((x + i) / scale_factor_width,
+                 (y + j) / scale_factor_height,
+                 depth / scale_factor_depth);
     }
 
   glEnd();
@@ -268,9 +270,9 @@ Keyboard(unsigned char key, int x, int y)
       vec3 crossv;
       crossv = glm::cross(lookat, viewer_up);
       glm::normalize(crossv);
-      viewer[0] += crossv[0] * camera_speed;
-      viewer[1] += crossv[1] * camera_speed;
-      viewer[2] += crossv[2] * camera_speed;
+      viewer[0] += crossv[0] * camera_speed * 4.0;
+      viewer[1] += crossv[1] * camera_speed * 4.0;
+      viewer[2] += crossv[2] * camera_speed * 4.0;
       update_lookat();
       update_viewer_up();
       break;
@@ -279,9 +281,9 @@ Keyboard(unsigned char key, int x, int y)
     case 'a': {
       vec3 crossv = cross(lookat, viewer_up);
       normalize(crossv);
-      viewer[0] -= crossv[0] * camera_speed;
-      viewer[1] -= crossv[1] * camera_speed;
-      viewer[2] -= crossv[2] * camera_speed;
+      viewer[0] -= crossv[0] * camera_speed * 4.0;
+      viewer[1] -= crossv[1] * camera_speed * 4.0;
+      viewer[2] -= crossv[2] * camera_speed * 4.0;
       update_lookat();
       update_viewer_up();
       break;

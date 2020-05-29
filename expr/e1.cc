@@ -181,7 +181,7 @@ namespace postprocessing {
   }
 
   void
-  blur(cv::Mat &mat)
+  blur_(cv::Mat &mat)
   {
     auto width = mat.cols;
     auto height = mat.rows;
@@ -189,6 +189,12 @@ namespace postprocessing {
     for (size_t j = 0; j < height; ++j)
       for (size_t i = 0; i < width; ++i)
         blur_at(mat, i, j);
+  }
+
+  void
+  blur(cv::Mat &mat, int ksize = 5)
+  {
+    cv::medianBlur(mat, mat, ksize);
   }
 
 }; // namespace postprocessing
@@ -411,6 +417,8 @@ main(int argc, char **argv)
 
   auto fno = argc >= 2 ? atoi(argv[1]) : 2;
 
+  if (fno == 5) fno = 2;
+
   fmt::print("Face: {}\n", fno);
 
   auto f = fopen(fmt::format("media/depth_raw{}", fno).c_str(), "rb");
@@ -478,7 +486,7 @@ main(int argc, char **argv)
   float g = 0.5f;
 
   int connectivity = 4, itype = CV_16U, ccltype = cv::CCL_WU;
-  int lowerb = 0, higherb = 255;
+  int lowerb = 5, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
   int area = 0;
   bool clr = false;
@@ -489,12 +497,13 @@ main(int argc, char **argv)
   bbox best_bbox_g;
   shared_t shared{ std::mutex(), depth_image_g, best_bbox_g };
   cv::setMouseCallback(wndname3, mouse_event_handler, &shared);
-  cv::namedWindow(wndname, cv::WINDOW_AUTOSIZE);
-  cv::createTrackbar("lowerb", wndname, &lowerb, 255);
-  cv::createTrackbar("higherb", wndname, &higherb, 255);
-  cv::createTrackbar("lowerb2", wndname, &lowerb2, 255);
-  cv::createTrackbar("higherb2", wndname, &higherb2, 255);
-  cv::createTrackbar("print", wndname, &p, 1);
+  //cv::namedWindow(wndname, cv::WINDOW_AUTOSIZE);
+  cv::createTrackbar("lowerb", wndname3, &lowerb, 255);
+  cv::setTrackbarPos("lowerb", wndname3, 5);
+  //cv::createTrackbar("higherb", wndname, &higherb, 255);
+  //cv::createTrackbar("lowerb2", wndname, &lowerb2, 255);
+  //cv::createTrackbar("higherb2", wndname, &higherb2, 255);
+  //cv::createTrackbar("print", wndname, &p, 1);
   while (c != 'q')
   {
     if (c == '+')
@@ -531,12 +540,12 @@ main(int argc, char **argv)
       cv::Mat(rgb_height, rgb_width, CV_8UC4, imgraw_rgb_base.get());
     auto image_th = cv::Mat(depth_height, depth_width, CV_8UC1);
 
-    cv::Mat image_depth_th = image_depth.clone(), image_depth_filtered;
+    cv::Mat image_depth_th, image_depth_filtered;
     //cv::threshold( image_depth, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
-    cv::inRange(image_depth, lowerb2, higherb2, image_depth_filtered);
 
     auto image_depth_blurred = image_depth.clone();
-    postprocessing::blur(image_depth_blurred);
+    postprocessing::blur(image_depth_blurred, (lowerb*2)+1);
+    cv::inRange(image_depth_blurred, lowerb2, higherb2, image_depth_filtered);
 
     cv::Mat labels, stats, centroids;
     cv::connectedComponentsWithStats(
@@ -544,7 +553,7 @@ main(int argc, char **argv)
 
     clr = !clr;
 
-    bbox best_bbox;
+    bbox best_bbox = {};
 
     int barea = 0;
     for (int i = 0; i < stats.rows; ++i)
@@ -583,8 +592,13 @@ main(int argc, char **argv)
     // cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
     p = 0;
 
-    cv::imshow(wndname3, image_depth);
-    cv::imshow(wndname2, image_depth_blurred);
+    //cv::imshow(wndname4, image_depth_orig);
+    //cv::imshow(wndname3, image_rgb);
+    //cv::imshow(wndname2, image_depth);
+    //cv::imshow(wndname, image_depth_base);
+    cv::imshow(wndname3, image_depth_blurred);
+    cv::imshow(wndname2, image_depth);
+    cv::imshow(wndname, image_depth_filtered);
     //cv::imshow(wndname, image_depth_filtered);
 
     { // Update global state
@@ -592,6 +606,8 @@ main(int argc, char **argv)
       shared.depth_image = image_depth_blurred;
       shared.best_bbox = best_bbox;
     }
+
+    fmt::print("Best bbox: {}\n", best_bbox.area);
 
     c = cv::waitKey(200);
   }
