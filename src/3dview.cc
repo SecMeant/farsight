@@ -16,6 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "camera.h"
 #include "types.h"
 #include "utils.h"
 
@@ -136,6 +137,8 @@ drawpoints(const std::vector<Point3f> &v, size_t width)
       float x = p.x * scale_factor_width, y = p.y * scale_factor_height,
             z = p.z * scale_factor_depth;
 
+      y *= (-1.0f);
+
       glVertex3f(x,y,z);
     }
 
@@ -241,6 +244,7 @@ static void
 Keyboard(unsigned char key, int x, int y)
 {
   constexpr double camera_speed = 0.2f;
+  float tspeed = 0.05f;
 
   switch (key)
   {
@@ -252,7 +256,7 @@ Keyboard(unsigned char key, int x, int y)
       mouse_sens *= 2.0f;
       break;
 
-    case 'l':
+    case 'q':
       lock_mouse = !lock_mouse;
       break;
 
@@ -293,6 +297,48 @@ Keyboard(unsigned char key, int x, int y)
       update_lookat();
       update_viewer_up();
       break;
+    }
+
+    case 'h':
+    case 'j':
+    case 'k':
+    case 'l':
+    case 'y':
+    case 'n': {
+      glm::vec3 tvec;
+
+      switch(key) {
+        case 'h': tvec = glm::vec3(tspeed, 0,0);
+        case 'j': tvec = glm::vec3(0,-tspeed,0);
+        case 'k': tvec = glm::vec3(0,tspeed,0);
+        case 'l': tvec = glm::vec3(-tspeed, 0,0);
+        case 'y': tvec = glm::vec3(0,0,tspeed);
+        case 'n': tvec = glm::vec3(0,0,-tspeed);
+      }
+
+      auto [_1, points, _2] = context3D.get_points_cam1();
+      camera2real(points, tvec);
+    }
+
+    case 'H':
+    case 'J':
+    case 'K':
+    case 'L':
+    case 'Y':
+    case 'N': {
+      glm::vec3 tvec;
+
+      switch(key) {
+        case 'H': tvec = glm::vec3(tspeed, 0,0);
+        case 'J': tvec = glm::vec3(0,-tspeed,0);
+        case 'K': tvec = glm::vec3(0,tspeed,0);
+        case 'L': tvec = glm::vec3(-tspeed, 0,0);
+        case 'Y': tvec = glm::vec3(0,0,tspeed);
+        case 'N': tvec = glm::vec3(0,0,-tspeed);
+      }
+
+      auto [_1, points, _2] = context3D.get_points_cam2();
+      camera2real(points, tvec);
     }
 
     default:

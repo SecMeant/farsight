@@ -4,6 +4,8 @@
 #include <mutex>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 namespace farsight {
   struct Point3f
   {
@@ -20,7 +22,7 @@ namespace farsight {
   {
   public:
     using PointInfoLocked = std::tuple<std::unique_lock<std::mutex>,
-               const std::vector<Point3f> &,
+               std::vector<Point3f> &,
                size_t>;
     void
     update_cam1(std::vector<Point3f> &&points, size_t width)
@@ -41,13 +43,13 @@ namespace farsight {
     }
 
     PointInfoLocked
-    get_points_cam1() const
+    get_points_cam1()
     {
       return { std::unique_lock(this->mtx), this->camshot1.points, this->camshot1.width };
     }
 
     PointInfoLocked
-    get_points_cam2() const
+    get_points_cam2()
     {
       return { std::unique_lock(this->mtx), this->camshot2.points, this->camshot2.width };
     }
