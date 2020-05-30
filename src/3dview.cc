@@ -323,8 +323,8 @@ Keyboard(unsigned char key, int x, int y)
     case 'j':
     case 'k':
     case 'l':
-    case 'y':
-    case 'n': {
+    case 'f':
+    case 'g': {
       auto [lck, cs] = context3D.get_points_cam1();
 
       switch (key)
@@ -343,10 +343,10 @@ Keyboard(unsigned char key, int x, int y)
           cs.tvec.y -= tspeed;
           break;
 
-        case 'y':
+        case 'f':
           cs.tvec.z += tspeed;
           break;
-        case 'n':
+        case 'g':
           cs.tvec.z -= tspeed;
           break;
       }
@@ -358,8 +358,8 @@ Keyboard(unsigned char key, int x, int y)
     case 'J':
     case 'K':
     case 'L':
-    case 'Y':
-    case 'N': {
+    case 'F':
+    case 'G': {
       auto [lck, cs] = context3D.get_points_cam2();
 
       switch (key)
@@ -378,10 +378,10 @@ Keyboard(unsigned char key, int x, int y)
           cs.tvec.y -= tspeed;
           break;
 
-        case 'Y':
+        case 'F':
           cs.tvec.z += tspeed;
           break;
-        case 'N':
+        case 'G':
           cs.tvec.z -= tspeed;
           break;
       }
