@@ -76,5 +76,16 @@ namespace farsight {
     context3D.set_rvec_cam2(v);
   }
 
+  Context3D::PointInfo
+  get_translated_points_cam1()
+  {
+    return context3D.get_translated_points_cam1();
+  }
+
+  Context3D::PointInfo
+  get_translated_points_cam2()
+  {
+    return context3D.get_translated_points_cam2();
+  }
 
 } // namespace farsight
