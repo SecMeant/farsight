@@ -38,8 +38,9 @@ struct shared_t
 constexpr int waitTime=50;
 // Defining the dimensions of checkerboard
 static int CHECKERBOARD[2]{8,6}; 
-static cv::Mat cameraMatrix,distCoeffs,R,T, rvec;
+static cv::Mat cameraMatrix, distCoeffs, R, T;
 static std::vector<cv::Vec3d> rvecs, tvecs;
+
 static libfreenect2::Frame md_frame = libfreenect2::Frame(depth_width, depth_height, sizeof(float));
 static bool arucoCalibrated = false;
 const char *wndname  = "wnd";
@@ -47,6 +48,7 @@ const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
 const char *wndaruco = "aruco";
+const char *arucoConfigPath = "../../,,/aruco/aruco.conf";
 
 constexpr int avg_max_number = 10;
 std::atomic_flag continue_flag;
@@ -132,7 +134,12 @@ void calibrateAruco()
   }
 
   cv::calibrateCamera(objpoints, imgpoints, cv::Size(color_height, color_width), cameraMatrix, distCoeffs, R, T);
-
+  cv::FileStorage storage(arucoConfigPath, cv::FileStorage::WRITE);
+  storage << "cameraMatrix" << cameraMatrix;
+  storage << "distCoeffs" << distCoeffs;
+  storage << "R" << R;
+  storage << "T" << T;
+  storage.release();
 }
 
 void findAruco(const cv::Mat &f)
@@ -331,7 +338,15 @@ main(int argc, char **argv)
       }
       break;
       case'l':
-
+      {
+          cv::FileStorage storage(arucoConfigPath, cv::FileStorage::READ);
+          storage["cameraMatrix"] >> cameraMatrix;
+          storage["distCoeffs"] >> distCoeffs;
+          storage["R"] >> R;
+          storage["T"] >> T;
+          storage.release();
+          arucoCalibrated = true;
+      }
       break;
       case 'r':
       case 'o': // find object depth
