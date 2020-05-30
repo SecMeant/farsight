@@ -139,7 +139,7 @@ drawpoints(const CameraShot &cs)
 
       p.y *= (-1.0f);
 
-      p = glm::rotateX(p, cs.angleRotX);
+      p = glm::rotateX(p, cs.rvec.x);
 
       glVertex3f(p.x,p.y,p.z);
     }
@@ -398,17 +398,17 @@ Keyboard(unsigned char key, int x, int y)
       switch (key)
       {
         case 'x':
-          cs.angleRotX += rotangle;
+          cs.rvec.x += rotangle;
           break;
         case 'y':
-          cs.angleRotY += rotangle;
+          cs.rvec.y += rotangle;
           break;
         case 'z':
-          cs.angleRotZ += rotangle;
+          cs.rvec.z += rotangle;
           break;
       }
 
-      fmt::print("CAM1 ROT: {} {} {}\n", cs.angleRotX, cs.angleRotY, cs.angleRotZ);
+      fmt::print("CAM1 ROT: {} {} {}\n", cs.rvec.x, cs.rvec.y, cs.rvec.z);
       break;
     }
 

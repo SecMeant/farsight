@@ -17,13 +17,14 @@ namespace farsight {
     size_t width = 1;
     std::vector<Point3f> points {{0,0,0}};
     glm::vec3 tvec {0.0f, 0.0f, 0.0f};
-    float angleRotX = 0.0f, angleRotY = 0.0f, angleRotZ = 0.0f;
+    glm::vec3 rvec {0.0f, 0.0f, 0.0f};
   };
 
   struct Context3D
   {
   public:
     using PointInfoLocked = std::tuple<std::unique_lock<std::mutex>, CameraShot&>;
+
     void
     update_cam1(std::vector<Point3f> &&points, size_t width)
     {
@@ -52,6 +53,62 @@ namespace farsight {
     get_points_cam2()
     {
       return { std::unique_lock(this->mtx), this->camshot2 };
+    }
+
+    glm::vec3
+    get_tvec_cam1()
+    {
+      std::unique_lock lck{ this->mtx };
+      return this->camshot1.tvec;
+    }
+
+    glm::vec3
+    get_rvec_cam1()
+    {
+      std::unique_lock lck{ this->mtx };
+      return this->camshot1.rvec;
+    }
+
+    glm::vec3
+    get_tvec_cam2()
+    {
+      std::unique_lock lck{ this->mtx };
+      return this->camshot2.tvec;
+    }
+
+    glm::vec3
+    get_rvec_cam2()
+    {
+      std::unique_lock lck{ this->mtx };
+      return this->camshot2.rvec;
+    }
+
+    void
+    set_tvec_cam1(glm::vec3 v)
+    {
+      std::unique_lock lck{ this->mtx };
+      this->camshot1.tvec = v;
+    }
+
+    void
+    set_rvec_cam1(glm::vec3 v)
+    {
+      std::unique_lock lck{ this->mtx };
+      this->camshot1.rvec = v;
+    }
+
+    void
+    set_tvec_cam2(glm::vec3 v)
+    {
+      std::unique_lock lck{ this->mtx };
+      this->camshot2.tvec = v;
+    }
+
+    void
+    set_rvec_cam2(glm::vec3 v)
+    {
+      std::unique_lock lck{ this->mtx };
+      this->camshot2.rvec = v;
     }
 
   private:
