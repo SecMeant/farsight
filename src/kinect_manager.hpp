@@ -10,7 +10,7 @@ struct kinect
   kinect();
   kinect(int d_idx);
   ~kinect();
-  void
+  bool
   open(int d_idx);
   void
   waitForFrames(int sec);

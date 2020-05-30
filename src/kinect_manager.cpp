@@ -15,22 +15,26 @@ kinect::kinect(int d_idx)
   this->open(d_idx);
 }
 
-void
+bool
 kinect::open(int d_idx)
 {
-  if (isActive)
-  {
-    this->releaseFrames();
-    this->close();
-  }
-  isActive = true;
   int devNumber = freenect2.enumerateDevices();
   if (devNumber == 0)
   {
     fmt::print("No devices connected\n");
     exit(-1);
   }
+  if (devNumber-1 < d_idx)
+      return false;
+
   fmt::print("Number of found devices: {}", devNumber);
+  
+  if (isActive)
+  {
+    this->releaseFrames();
+    this->close();
+  }
+  isActive = true;
 
   std::string serial = freenect2.getDeviceSerialNumber(d_idx);
 
@@ -43,13 +47,14 @@ kinect::open(int d_idx)
   dev->setIrAndDepthFrameListener(&listener);
 
   if (!dev->start())
-    exit(-1);
+    return false;
 
   fmt::print("Connecting to the device\n"
              "Device serial number	: {}\n"
              "Device firmware	: {}\n",
              dev->getSerialNumber(),
              dev->getFirmwareVersion());
+  return true;
 }
 
 void

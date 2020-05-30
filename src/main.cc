@@ -164,7 +164,8 @@ void findAruco(const cv::Mat &f)
 }
 
 void generateScene(const libfreenect2::Registration &reg,
-                     const libfreenect2::Frame *f)
+                     const libfreenect2::Frame *f,
+                     const int cam)
 {
  farsight::Point3f p{0,0,0};
  pointArray pointMap;
@@ -187,7 +188,7 @@ void generateScene(const libfreenect2::Registration &reg,
     for( int c = 0; c < translation_matrix.cols; c++)
     {
         auto d = translation_matrix.at<double>(r,c);
-        grmat[c][r] = d;
+        grmat[r][c] = d;
     }
  }
 
@@ -210,7 +211,10 @@ void generateScene(const libfreenect2::Registration &reg,
  }
  fmt::print("Updating opngl");
  farsight::camera2real(pointMap, gtvec, grmat);
- farsight::update_points_cam1(pointMap, depth_width);
+ if(cam == 0)
+     farsight::update_points_cam1(pointMap, depth_width);
+ else
+     farsight::update_points_cam2(pointMap, depth_width);
 }
 
 // return array of points with mapped 
@@ -299,7 +303,7 @@ main(int argc, char **argv)
         findAruco(gray);
         if(c == 's')
         {
-          generateScene(reg, depth);
+          generateScene(reg, depth, selectedKinnect);
         }
     }
 
@@ -361,12 +365,12 @@ main(int argc, char **argv)
         }
         break;
       case '1':
-        selectedKinnect = 0;
-        k_dev.open(selectedKinnect);
+        if(k_dev.open(0))
+            selectedKinnect = 0;
         break;
       case '2':
-        selectedKinnect = 1;
-        k_dev.open(selectedKinnect);
+        if(k_dev.open(1))
+            selectedKinnect = 1;
         break;
     }
 
