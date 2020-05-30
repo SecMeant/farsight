@@ -12,10 +12,16 @@ namespace farsight {
   void
   init3d();
 
-  void
-  update_points(std::vector<farsight::Point3f> points, size_t width)
+  inline void
+  update_points_cam1(std::vector<farsight::Point3f> points, size_t width)
   {
-    context3D.update(std::move(points), width);
+    context3D.update_cam1(std::move(points), width);
+  }
+
+  inline void
+  update_points_cam2(std::vector<farsight::Point3f> points, size_t width)
+  {
+    context3D.update_cam2(std::move(points), width);
   }
 
 } // namespace farsight

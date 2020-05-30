@@ -160,7 +160,7 @@ RenderScene(void)
             viewer_up[2]);
   Axes();
 
-  auto [_, points, width] = context3D.get_points();
+  auto [_, points, width] = context3D.get_points_cam1();
   drawpoints(points, width);
 
   glFlush();

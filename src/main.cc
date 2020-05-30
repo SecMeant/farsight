@@ -210,7 +210,7 @@ void generateScene(const libfreenect2::Registration &reg,
  }
  fmt::print("Updating opngl");
  farsight::camera2real(pointMap, gtvec, grmat);
- farsight::update_points(pointMap, depth_width);
+ farsight::update_points_cam1(pointMap, depth_width);
 }
 
 // return array of points with mapped 

@@ -10,30 +10,51 @@ namespace farsight {
     float x, y, z;
   };
 
+  struct CameraShot
+  {
+    size_t width = 1;
+    std::vector<Point3f> points {{0,0,0}};
+  };
+
   struct Context3D
   {
   public:
+    using PointInfoLocked = std::tuple<std::unique_lock<std::mutex>,
+               const std::vector<Point3f> &,
+               size_t>;
     void
-    update(std::vector<Point3f> &&points, size_t width)
+    update_cam1(std::vector<Point3f> &&points, size_t width)
     {
       std::unique_lock lck{ this->mtx };
 
-      this->points = std::move(points);
-      this->width = width;
+      this->camshot1.points = std::move(points);
+      this->camshot1.width = width;
     }
 
-    std::tuple<std::unique_lock<std::mutex>,
-               const std::vector<Point3f> &,
-               size_t>
-    get_points() const
+    void
+    update_cam2(std::vector<Point3f> &&points, size_t width)
     {
-      return { std::unique_lock(this->mtx), this->points, this->width };
+      std::unique_lock lck{ this->mtx };
+
+      this->camshot2.points = std::move(points);
+      this->camshot2.width = width;
+    }
+
+    PointInfoLocked
+    get_points_cam1() const
+    {
+      return { std::unique_lock(this->mtx), this->camshot1.points, this->camshot1.width };
+    }
+
+    PointInfoLocked
+    get_points_cam2() const
+    {
+      return { std::unique_lock(this->mtx), this->camshot2.points, this->camshot2.width };
     }
 
   private:
     mutable std::mutex mtx;
-    size_t width = 1;
-    std::vector<Point3f> points {{0,0,0}};
+    CameraShot camshot1, camshot2;
   };
 
 } // namespace farsight
