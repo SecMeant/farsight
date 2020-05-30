@@ -16,14 +16,13 @@ namespace farsight {
   {
     size_t width = 1;
     std::vector<Point3f> points {{0,0,0}};
+    glm::vec3 tvec {0.0f, 0.0f, 0.0f};
   };
 
   struct Context3D
   {
   public:
-    using PointInfoLocked = std::tuple<std::unique_lock<std::mutex>,
-               std::vector<Point3f> &,
-               size_t>;
+    using PointInfoLocked = std::tuple<std::unique_lock<std::mutex>, CameraShot&>;
     void
     update_cam1(std::vector<Point3f> &&points, size_t width)
     {
@@ -45,13 +44,13 @@ namespace farsight {
     PointInfoLocked
     get_points_cam1()
     {
-      return { std::unique_lock(this->mtx), this->camshot1.points, this->camshot1.width };
+      return { std::unique_lock(this->mtx), this->camshot1 };
     }
 
     PointInfoLocked
     get_points_cam2()
     {
-      return { std::unique_lock(this->mtx), this->camshot2.points, this->camshot2.width };
+      return { std::unique_lock(this->mtx), this->camshot2 };
     }
 
   private:

@@ -113,15 +113,15 @@ matrix_point_at(const Point3f *mat, size_t x, size_t y, size_t w)
 }
 
 static void
-drawpoints(const std::vector<Point3f> &v, size_t width)
+drawpoints(const CameraShot &cs)
 {
-  auto w = width;
+  auto w = cs.width;
   size_t i = 0;
   size_t j = 0;
   constexpr float scale_factor_depth = 1.0f;
   constexpr float scale_factor_width = 1.0f;
   constexpr float scale_factor_height = 1.0f;
-  size_t h = v.size() / w;
+  size_t h = cs.points.size() / w;
 
   glBegin(GL_POINTS);
   glColor3f(1.0f, 1.0f, 1.0f);
@@ -129,13 +129,17 @@ drawpoints(const std::vector<Point3f> &v, size_t width)
   for (size_t j = 0; j < h - 1; ++j)
     for (size_t i = 0; i < w - 1; ++i)
     {
-      auto p = matrix_point_at(v.data(), i, j, w);
+      auto p = matrix_point_at(cs.points.data(), i, j, w);
 
       if (std::isnan(p.z))
         continue;
 
       float x = p.x * scale_factor_width, y = p.y * scale_factor_height,
             z = p.z * scale_factor_depth;
+
+      x += cs.tvec.x;
+      y += cs.tvec.y;
+      z += cs.tvec.z;
 
       y *= (-1.0f);
 
@@ -313,19 +317,33 @@ Keyboard(unsigned char key, int x, int y)
     case 'l':
     case 'y':
     case 'n': {
-      glm::vec3 tvec;
+      auto [lck, cs] = context3D.get_points_cam1();
 
-      switch(key) {
-        case 'h': tvec = glm::vec3(tspeed, 0,0);break;
-        case 'j': tvec = glm::vec3(0,-tspeed,0);break;
-        case 'k': tvec = glm::vec3(0,tspeed,0);break;
-        case 'l': tvec = glm::vec3(-tspeed, 0,0);break;
-        case 'y': tvec = glm::vec3(0,0,tspeed);break;
-        case 'n': tvec = glm::vec3(0,0,-tspeed);break;
+      switch (key)
+      {
+        case 'h':
+          cs.tvec.x -= tspeed;
+          break;
+        case 'l':
+          cs.tvec.x += tspeed;
+          break;
+
+        case 'j':
+          cs.tvec.y += tspeed;
+          break;
+        case 'k':
+          cs.tvec.y -= tspeed;
+          break;
+
+        case 'y':
+          cs.tvec.z += tspeed;
+          break;
+        case 'n':
+          cs.tvec.z -= tspeed;
+          break;
       }
 
-      auto [_1, points, _2] = context3D.get_points_cam1();
-      camera2real(points, tvec);
+      fmt::print("CAM1 TVEC: {} {} {}\n", cs.tvec.x, cs.tvec.y, cs.tvec.z);
     }
 
     case 'H':
@@ -334,19 +352,33 @@ Keyboard(unsigned char key, int x, int y)
     case 'L':
     case 'Y':
     case 'N': {
-      glm::vec3 tvec;
+      auto [lck, cs] = context3D.get_points_cam2();
 
-      switch(key) {
-        case 'H': tvec = glm::vec3(tspeed, 0,0);break;
-        case 'J': tvec = glm::vec3(0,-tspeed,0);break;
-        case 'K': tvec = glm::vec3(0,tspeed,0); break;
-        case 'L': tvec = glm::vec3(-tspeed, 0,0);break;
-        case 'Y': tvec = glm::vec3(0,0,tspeed); break;
-        case 'N': tvec = glm::vec3(0,0,-tspeed);break;
+      switch (key)
+      {
+        case 'H':
+          cs.tvec.x -= tspeed;
+          break;
+        case 'L':
+          cs.tvec.x += tspeed;
+          break;
+
+        case 'J':
+          cs.tvec.y += tspeed;
+          break;
+        case 'K':
+          cs.tvec.y -= tspeed;
+          break;
+
+        case 'Y':
+          cs.tvec.z += tspeed;
+          break;
+        case 'N':
+          cs.tvec.z -= tspeed;
+          break;
       }
 
-      auto [_1, points, _2] = context3D.get_points_cam2();
-      camera2real(points, tvec);
+      fmt::print("CAM2 TVEC: {} {} {}\n", cs.tvec.x, cs.tvec.y, cs.tvec.z);
     }
 
     default:
