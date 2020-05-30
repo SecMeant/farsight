@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(farsight)
 
-set(CMAKE_CXX_STANDARD 17)
-
 option(BUILD_EXPERIMENTS "Build exepriments" OFF)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
@@ -19,6 +17,8 @@ find_package(fmt REQUIRED)
 
 file(GLOB CXX_SRC src/*.cc src/*.cpp)
 
+include_directories(inc/)
+
 if (BUILD_EXPERIMENTS)
 	add_executable(aruco expr/aruco.cc)
 	add_executable(aruco_dump expr/aruco_dump.cc src/kinect_manager.cpp)
@@ -30,6 +30,6 @@ endif()
 
 add_executable(test ${CXX_SRC})
 
-target_link_libraries(test ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
+target_link_libraries(test ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL glut GLU fmt::fmt)
 set_property(TARGET test PROPERTY CXX_STANDARD 17)
 

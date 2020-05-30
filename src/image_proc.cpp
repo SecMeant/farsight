@@ -75,7 +75,7 @@ detector::setConfig(int kinectID,
                     objectType t,
                     const cv::Mat &img,
                     const bbox &a,
-                    const cv::Point3f &p,
+                    const farsight::Point3f &p,
                     const pointArray &pointCloud)
 {
   auto &c =config[kinectID].objects[to_underlying(t)];

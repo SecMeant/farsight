@@ -22,7 +22,7 @@ public:
             const objectType t,
             const cv::Mat &imgDepth,
             const bbox &a,
-            const cv::Point3f &p,
+            const farsight::Point3f &p,
             const pointArray &flattened);
   void
   saveDepthFrame(int kinectID,
@@ -55,6 +55,6 @@ private:
   std::array<cameraConfig, maxKinectCount> config;
   cv::Mat configScreen;
   cv::Rect matRoi;
-  cv::Point3f cameraOffsets;
+  farsight::Point3f cameraOffsets;
   pointArray map_;
 };

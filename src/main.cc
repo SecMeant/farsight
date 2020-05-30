@@ -18,6 +18,10 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "3d.h"
+#include "camera.h"
+#include "types.h"
+#include <thread>
 
 extern "C"
 {
@@ -67,7 +71,7 @@ mouse_event_handler( int event, int x, int y, int flags, void *userdata )
   shared_t *shared = static_cast<shared_t *>(userdata);
   if (event == cv::EVENT_LBUTTONDOWN)
   {
-    Point3f p;
+    farsight::Point3f p;
     int pos;
     std::scoped_lock lck(shared->lock);
     shared->reg.getPointXYZ(&md_frame, y, x, p.x, p.y, p.z);
@@ -159,13 +163,11 @@ void findAruco(const cv::Mat &f)
   cv::imshow(wndaruco, imageCopy);
 }
 
-void saveSceneToFile(const libfreenect2::Registration &reg,
+void generateScene(const libfreenect2::Registration &reg,
                      const libfreenect2::Frame *f)
 {
- Point3f p{0,0,0};
- auto *file = fopen("detected_frame", "w");
- if(file == nullptr)
-     return;
+ farsight::Point3f p{0,0,0};
+ pointArray pointMap;
 
  if(!tvecs.size() || !rvecs.size())
     return;
@@ -173,29 +175,19 @@ void saveSceneToFile(const libfreenect2::Registration &reg,
  float nan = NAN;
 
  auto& tvec = tvecs[0];
- tvec[0] *= -1;
- tvec[1] *= -1;
- tvec[2] *= -1;
+ glm::vec3 gtvec = {tvec[0], tvec[1], tvec[2]};
 
  cv::Mat r_mat;
- fmt::print(" rvecs {} {} {} \n",rvecs[0][0],rvecs[0][1],rvecs[0][2]);
  cv::Rodrigues(rvecs[0], r_mat);
  cv::Mat translation_matrix = r_mat.inv();
- fwrite(&f->width,sizeof(float), 1, file);
- auto tmp_tvec_v = static_cast<float>(tvec[0]);
- fwrite(&tmp_tvec_v , sizeof(float), 1, file);
- tmp_tvec_v = static_cast<float>(tvec[1]);
- fwrite(&tmp_tvec_v , sizeof(float), 1, file);
- tmp_tvec_v = static_cast<float>(tvec[2]);
- fwrite(&tmp_tvec_v , sizeof(float), 1, file);
 
+ glm::mat3x3 grmat;
  for(int r = 0; r< translation_matrix.rows; r++)
  {
     for( int c = 0; c < translation_matrix.cols; c++)
     {
         auto d = translation_matrix.at<double>(r,c);
-        fmt::print("{} s ", d);
-        fwrite(&d, sizeof(double), 1, file);
+        grmat[c][r] = d;
     }
  }
 
@@ -209,18 +201,16 @@ void saveSceneToFile(const libfreenect2::Registration &reg,
     reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
 
     if(p.z < 4.5){
-        fwrite(&p.x, sizeof(float),1, file);
-        fwrite(&p.y, sizeof(float),1, file);
-        fwrite(&p.z, sizeof(float),1, file);
+        pointMap.push_back({p.x, p.y, p.z});
     }
     else{
-        fwrite(&nan, sizeof(float),1, file);
-        fwrite(&nan, sizeof(float),1, file);
-        fwrite(&nan, sizeof(float),1, file);
+        pointMap.push_back({nan,nan,nan});
     }
    }
  }
- fclose(file);
+ fmt::print("Updating opngl");
+ farsight::camera2real(pointMap, gtvec, grmat);
+ farsight::update_points(pointMap, depth_width);
 }
 
 // return array of points with mapped 
@@ -231,7 +221,7 @@ createPointMaping(const libfreenect2::Registration &reg,
                   const byte *filtered,
                   const bbox &b)
 {
- Point3f p;
+ farsight::Point3f p;
  pointArray map;
  int pos;
  for(int r=b.y; r < b.y+b.h; r++)
@@ -243,7 +233,7 @@ createPointMaping(const libfreenect2::Registration &reg,
       continue;
 
     reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-    map.emplace_back(p.x*M_TO_MM, p.y*M_TO_MM, p.z*M_TO_MM);
+    map.push_back({p.x*M_TO_MM, p.y*M_TO_MM, p.z*M_TO_MM});
    }
  }
  return map;
@@ -262,11 +252,13 @@ main(int argc, char **argv)
 
   int c = 0;
   bbox boxAverage;
-  Point3f nearestPointAvg;
+  farsight::Point3f nearestPointAvg;
   nearestPointAvg.z= 0;
 
   int avg_number = 0; // 1?
   int selectedKinnect = 0;
+  std::thread gl_thread(farsight::init3d);
+  gl_thread.detach();
 
   detector dec;
   kinect k_dev(selectedKinnect);
@@ -307,7 +299,7 @@ main(int argc, char **argv)
         findAruco(gray);
         if(c == 's')
         {
-          saveSceneToFile(reg, depth);
+          generateScene(reg, depth);
         }
     }
 

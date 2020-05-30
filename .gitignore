@@ -1,3 +1,5 @@
 depends/
 build/
-tags
+compile_commands.json
+*.swp
+*.swo

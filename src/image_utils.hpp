@@ -7,6 +7,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/photo.hpp>
+#include "types.h"
 
 using byte = unsigned char;
 constexpr float M_TO_MM = 1000.0;
@@ -50,11 +51,11 @@ depthProcess(libfreenect2::Frame *frame);
 
 // byte, short, int, float ...
 template<typename Format>
-cv::Point3f
+farsight::Point3f
 findNearestPoint(const bbox &area, const byte *frame, const byte *filtered)
 {
   constexpr int mm_to_cm = 10;
-  cv::Point3f dep;
+  farsight::Point3f dep;
   int pos = area.y * area.w + area.x;
   const auto *depth = reinterpret_cast<const Format *>(frame);
 
