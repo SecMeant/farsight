@@ -256,6 +256,14 @@ Keyboard(unsigned char key, int x, int y)
       mouse_sens *= 2.0f;
       break;
 
+    case '+':
+      tspeed *= 2;
+      break;
+
+    case '-':
+      tspeed /= 2;
+      break;
+
     case 'q':
       lock_mouse = !lock_mouse;
       break;
