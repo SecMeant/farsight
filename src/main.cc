@@ -2,6 +2,7 @@
 #include <memory>
 #include <stdio.h>
 #include <limits>
+#include <mutex>
 
 #include "image_proc.hpp"
 #include "kinect_manager.hpp"
@@ -23,15 +24,25 @@ extern "C"
 #include <signal.h>
 #include <unistd.h>
 }
+
+struct shared_t
+{
+  std::mutex lock;
+  libfreenect2::Registration &reg;
+};
+
 constexpr int waitTime=50;
 // Defining the dimensions of checkerboard
-int CHECKERBOARD[2]{6,9}; 
-cv::Mat cameraMatrix,distCoeffs,R,T, rvec;
-bool arucoCalibrated = false;
+static int CHECKERBOARD[2]{8,6}; 
+static cv::Mat cameraMatrix,distCoeffs,R,T, rvec;
+static std::vector<cv::Vec3d> rvecs, tvecs;
+static libfreenect2::Frame md_frame = libfreenect2::Frame(depth_width, depth_height, sizeof(float));
+static bool arucoCalibrated = false;
 const char *wndname  = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
+const char *wndaruco = "aruco";
 
 constexpr int avg_max_number = 10;
 std::atomic_flag continue_flag;
@@ -50,6 +61,21 @@ sigint_handler(int signo)
     continue_flag.clear();
   }
 }
+void
+mouse_event_handler( int event, int x, int y, int flags, void *userdata )
+{
+  shared_t *shared = static_cast<shared_t *>(userdata);
+  if (event == cv::EVENT_LBUTTONDOWN)
+  {
+    Point3f p;
+    int pos;
+    std::scoped_lock lck(shared->lock);
+    shared->reg.getPointXYZ(&md_frame, y, x, p.x, p.y, p.z);
+    pos = y*depth_width + x;
+    fmt::print("Value: {} {} {} {}\n",md_frame.data[pos], p.x, p.y, p.z);
+  }
+}
+
 void calibrateAruco()
 {
 
@@ -79,7 +105,7 @@ void calibrateAruco()
 
     // Finding checker board corners
     // If desired number of corners are found in the image then success = true  
-    success = cv::findChessboardCorners(f, cv::Size(CHECKERBOARD[0], CHECKERBOARD[1]), corner_pts, cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_FAST_CHECK | cv::CALIB_CB_NORMALIZE_IMAGE);
+    success = cv::findChessboardCorners(f, cv::Size(CHECKERBOARD[0], CHECKERBOARD[1]), corner_pts, cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
     
     /* 
      * If desired number of corner are detected,
@@ -99,12 +125,7 @@ void calibrateAruco()
       objpoints.push_back(objp);
       imgpoints.push_back(corner_pts);
     }
-
-    cv::imshow("Image", f);
-    cv::waitKey(10);
   }
-
-  cv::destroyAllWindows();
 
   cv::calibrateCamera(objpoints, imgpoints, cv::Size(color_height, color_width), cameraMatrix, distCoeffs, R, T);
 
@@ -118,48 +139,90 @@ void findAruco(const cv::Mat &f)
 {
   // camera parameters are read from somewhere
   cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
-      cv::Mat imageCopy;
-      f.copyTo(imageCopy);
-      std::vector<int> ids;
-      std::vector<std::vector<cv::Point2f>> corners;
-      cv::aruco::detectMarkers(f, dictionary, corners, ids);
-      // if at least one marker detected
-      if (ids.size() > 0) {
-          cv::aruco::drawDetectedMarkers(imageCopy, corners, ids);
-          std::vector<cv::Vec3d> rvecs, tvecs;
-          cv::aruco::estimatePoseSingleMarkers(corners, 40, cameraMatrix, distCoeffs, rvecs, tvecs);
-          if(tvecs.size()  && rvecs.size())
-          {
-              cv::Rodrigues(rvecs[0], rvec);
-              auto v = rvec*cv::Mat(tvecs[0]);
-              std::cout<<v<<"\n";
-          }
-          // draw axis for each marker
-          for(int i=0; i<ids.size(); i++)
-              cv::aruco::drawAxis(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.1);
-      }
-      cv::imshow("out", imageCopy);
+  cv::Mat imageCopy;
+  f.copyTo(imageCopy);
+  std::vector<int> ids;
+  std::vector<std::vector<cv::Point2f>> corners;
+  cv::aruco::detectMarkers(f, dictionary, corners, ids);
+  // if at least one marker detected
+  if (ids.size() > 0) {
+    cv::aruco::drawDetectedMarkers(imageCopy, corners, ids);
+    cv::aruco::estimatePoseSingleMarkers(corners, 0.40, cameraMatrix, distCoeffs, rvecs, tvecs);
+    if(tvecs.size()  && rvecs.size())
+    {
+        fmt::print("{} {} {} \n", tvecs[0][0], tvecs[0][1],tvecs[0][2]);
+    }
+    // draw axis for each marker
+    for(int i=0; i<ids.size(); i++)
+        cv::aruco::drawAxis(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.20);
+  }
+  cv::imshow(wndaruco, imageCopy);
 }
 
-void saveFrameToFile(const libfreenect2::Registration &reg,
+void saveSceneToFile(const libfreenect2::Registration &reg,
                      const libfreenect2::Frame *f)
 {
- Point3f p;
- auto *file = fopen("frame_decded", "w");
+ Point3f p{0,0,0};
+ auto *file = fopen("detected_frame", "w");
  if(file == nullptr)
      return;
 
+ if(!tvecs.size() || !rvecs.size())
+    return;
+
+ float nan = NAN;
+
+ auto& tvec = tvecs[0];
+ tvec[0] *= -1;
+ tvec[1] *= -1;
+ tvec[2] *= -1;
+
+ cv::Mat r_mat;
+ fmt::print(" rvecs {} {} {} \n",rvecs[0][0],rvecs[0][1],rvecs[0][2]);
+ cv::Rodrigues(rvecs[0], r_mat);
+ cv::Mat translation_matrix = r_mat.inv();
+ fwrite(&f->width,sizeof(float), 1, file);
+ auto tmp_tvec_v = static_cast<float>(tvec[0]);
+ fwrite(&tmp_tvec_v , sizeof(float), 1, file);
+ tmp_tvec_v = static_cast<float>(tvec[1]);
+ fwrite(&tmp_tvec_v , sizeof(float), 1, file);
+ tmp_tvec_v = static_cast<float>(tvec[2]);
+ fwrite(&tmp_tvec_v , sizeof(float), 1, file);
+
+ for(int r = 0; r< translation_matrix.rows; r++)
+ {
+    for( int c = 0; c < translation_matrix.cols; c++)
+    {
+        auto d = translation_matrix.at<double>(r,c);
+        fmt::print("{} s ", d);
+        fwrite(&d, sizeof(double), 1, file);
+    }
+ }
+
+ float *ud = reinterpret_cast<float*>(f->data);
+ int pos;
  for(int r=0; r < f->height; r++)
  {
    for(int c=0; c < f->width; c++)
    {
+    pos = r*f->width + c;
     reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-    fprintf(file, "%f %f %f\n", p.x, p.y, p.z);
+
+    if(p.z < 4.5){
+        fwrite(&p.x, sizeof(float),1, file);
+        fwrite(&p.y, sizeof(float),1, file);
+        fwrite(&p.z, sizeof(float),1, file);
+    }
+    else{
+        fwrite(&nan, sizeof(float),1, file);
+        fwrite(&nan, sizeof(float),1, file);
+        fwrite(&nan, sizeof(float),1, file);
+    }
    }
  }
  fclose(file);
 }
-int frame_nr=0;
+
 // return array of points with mapped 
 // the real x y z coordinates in milimiters
 pointArray 
@@ -195,6 +258,8 @@ main(int argc, char **argv)
     fmt::print("Failed to register signal handler.\n");
     exit(-2);
   }
+  libfreenect2::Frame *rgb, *ir, *depth; 
+
   int c = 0;
   bbox boxAverage;
   Point3f nearestPointAvg;
@@ -207,25 +272,43 @@ main(int argc, char **argv)
   kinect k_dev(selectedKinnect);
   libfreenect2::Frame undistorted(depth_width, depth_height, sizeof(float)), 
                       registered(color_width, color_height, sizeof(unsigned int));
+
   libfreenect2::Registration reg(k_dev.getIRParams(),
                                  k_dev.getColorParams());
+  shared_t shared{std::mutex(), reg};
+  cv::namedWindow(wndname2, cv::WINDOW_AUTOSIZE);
+  cv::setMouseCallback(wndname2, mouse_event_handler, &shared);
+  
   objectType t;
   while (continue_flag.test_and_set() and c != 'q')
   {
     k_dev.waitForFrames(10);
-    libfreenect2::Frame *rgb = k_dev.frames[libfreenect2::Frame::Color];
-    libfreenect2::Frame *ir = k_dev.frames[libfreenect2::Frame::Ir];
-    libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
+
+    rgb = k_dev.frames[libfreenect2::Frame::Color];
+    ir = k_dev.frames[libfreenect2::Frame::Ir];
+    depth = k_dev.frames[libfreenect2::Frame::Depth];
+    memcpy(md_frame.data, depth->data, depth_width*depth_height*sizeof(float)); 
+    auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
+    cv::Mat gray;
+    cv::cvtColor(image_rgb, gray,cv::COLOR_BGR2GRAY);
+    
     if (c == 'r')
     {
       t = objectType::REFERENCE_OBJ;
-      reg.apply(rgb, depth, &undistorted, &registered);
-      dec.saveDepthFrame(selectedKinnect, t, &undistorted);
+      dec.saveDepthFrame(selectedKinnect, t, depth);
     }else if(c == 'o')
     {
       t = objectType::MEASURED_OBJ;
-      reg.apply(rgb, depth, &undistorted, &registered);
-      dec.saveDepthFrame(selectedKinnect, t, &undistorted);
+      dec.saveDepthFrame(selectedKinnect, t, depth);
+    }
+
+    if(arucoCalibrated == true)
+    {
+        findAruco(gray);
+        if(c == 's')
+        {
+          saveSceneToFile(reg, depth);
+        }
     }
 
     depthProcess(depth);
@@ -234,9 +317,6 @@ main(int argc, char **argv)
 
     auto image_depth =
       cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
-    auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-    cv::Mat gray;
-    cv::cvtColor( image_rgb, gray,cv::COLOR_BGR2GRAY);
 
     switch (c)
     {
@@ -248,7 +328,7 @@ main(int argc, char **argv)
       break;
       case ' ':
       {
-        cv::glob("../../aruco/*.jpg", images);
+        cv::glob("../../../aruco/*.jpg", images);
       }
       break;
       case 'c':
@@ -278,11 +358,10 @@ main(int argc, char **argv)
           nearestPoint.z = nearestPointAvg.z / avg_max_number;
           detectedBox.w = boxAverage.w / avg_max_number;
           detectedBox.y = boxAverage.h / avg_max_number;
-          saveFrameToFile(reg, &undistorted);
           nearestPointAvg.z= 0;
           boxAverage.reset();
           avg_number = 0;
-          auto realPoints = createPointMaping(reg, &undistorted, depth->data, detectedBox);
+          auto realPoints = createPointMaping(reg, depth, depth->data, detectedBox);
           dec.setConfig(selectedKinnect, t, image_depth, detectedBox, nearestPoint, realPoints);
           dec.translate(t);
           dec.displayCurrectConfig();
@@ -298,11 +377,7 @@ main(int argc, char **argv)
         k_dev.open(selectedKinnect);
         break;
     }
-    if(arucoCalibrated == true){
-        findAruco(gray);
-    }
 
-    cv::imshow(wndname,gray);
     cv::imshow(wndname2, image_depth);
     c = cv::waitKey(waitTime);
     k_dev.releaseFrames();
