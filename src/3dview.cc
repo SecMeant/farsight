@@ -15,6 +15,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 
 #include "camera.h"
 #include "types.h"
@@ -118,9 +119,6 @@ drawpoints(const CameraShot &cs)
   auto w = cs.width;
   size_t i = 0;
   size_t j = 0;
-  constexpr float scale_factor_depth = 1.0f;
-  constexpr float scale_factor_width = 1.0f;
-  constexpr float scale_factor_height = 1.0f;
   size_t h = cs.points.size() / w;
 
   glBegin(GL_POINTS);
@@ -129,21 +127,21 @@ drawpoints(const CameraShot &cs)
   for (size_t j = 0; j < h - 1; ++j)
     for (size_t i = 0; i < w - 1; ++i)
     {
-      auto p = matrix_point_at(cs.points.data(), i, j, w);
+      Point3f p_ = matrix_point_at(cs.points.data(), i, j, w);
+      glm::vec3 p {p_.x, p_.y, p_.z};
 
       if (std::isnan(p.z))
         continue;
 
-      float x = p.x * scale_factor_width, y = p.y * scale_factor_height,
-            z = p.z * scale_factor_depth;
+      p.x += cs.tvec.x;
+      p.y += cs.tvec.y;
+      p.z += cs.tvec.z;
 
-      x += cs.tvec.x;
-      y += cs.tvec.y;
-      z += cs.tvec.z;
+      p.y *= (-1.0f);
 
-      y *= (-1.0f);
+      p = glm::rotateX(p, cs.angleRotX);
 
-      glVertex3f(x,y,z);
+      glVertex3f(p.x,p.y,p.z);
     }
 
   glEnd();
@@ -257,6 +255,7 @@ Keyboard(unsigned char key, int x, int y)
 {
   constexpr double camera_speed = 0.2f;
   float tspeed = 0.05f;
+  float rotangle = (M_PI * 2.0f) / 32.0f;
 
   switch (key)
   {
@@ -352,6 +351,7 @@ Keyboard(unsigned char key, int x, int y)
       }
 
       fmt::print("CAM1 TVEC: {} {} {}\n", cs.tvec.x, cs.tvec.y, cs.tvec.z);
+      break;
     }
 
     case 'H':
@@ -387,6 +387,29 @@ Keyboard(unsigned char key, int x, int y)
       }
 
       fmt::print("CAM2 TVEC: {} {} {}\n", cs.tvec.x, cs.tvec.y, cs.tvec.z);
+      break;
+    }
+
+    case 'x':
+    case 'y':
+    case 'z': {
+      auto [lck, cs] = context3D.get_points_cam1();
+
+      switch (key)
+      {
+        case 'x':
+          cs.angleRotX += rotangle;
+          break;
+        case 'y':
+          cs.angleRotY += rotangle;
+          break;
+        case 'z':
+          cs.angleRotZ += rotangle;
+          break;
+      }
+
+      fmt::print("CAM1 ROT: {} {} {}\n", cs.angleRotX, cs.angleRotY, cs.angleRotZ);
+      break;
     }
 
     default:

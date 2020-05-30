@@ -17,6 +17,7 @@ namespace farsight {
     size_t width = 1;
     std::vector<Point3f> points {{0,0,0}};
     glm::vec3 tvec {0.0f, 0.0f, 0.0f};
+    float angleRotX = 0.0f, angleRotY = 0.0f, angleRotZ = 0.0f;
   };
 
   struct Context3D
