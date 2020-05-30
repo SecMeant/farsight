@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(farsight)
 
-set(CMAKE_CXX_STANDARD 17)
-
 option(BUILD_EXPERIMENTS "Build exepriments" OFF)
 
 LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
@@ -19,12 +17,14 @@ find_package(fmt REQUIRED)
 
 file(GLOB CXX_SRC src/*.cc src/*.cpp)
 
+include_directories(inc/)
+
 if (BUILD_EXPERIMENTS)
 	add_executable(e1 expr/e1.cc)
 	target_link_libraries(e1 ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
 	add_custom_command(TARGET e1 POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/media ${CMAKE_BINARY_DIR}/media)
-
 	add_subdirectory(expr/3dview)
+	set_property(TARGET e1 PROPERTY CXX_STANDARD 17)
 endif()
 
 add_executable(test ${CXX_SRC})

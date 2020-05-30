@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cmath>
 #include <vector>
+#include <mutex>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -14,6 +15,12 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include "types.h"
+#include "utils.h"
+
+using farsight::Point3f;
+using farsight::Context3D;
 
 using glm::vec3;
 using glm::value_ptr;
@@ -48,19 +55,7 @@ static GLfloat scale = 1;
 static GLfloat offset_x = 0;
 static GLfloat offset_y = 0;
 
-struct Point3f
-{
-  float x,y,z;
-};
-
-struct DataHeader
-{
-  float width, camera_pos[3], camera_rot[9];
-};
-
-DataHeader data_header;
-
-std::vector<Point3f> points;
+Context3D context3D;
 
 static void
 Axes(void)
@@ -103,8 +98,6 @@ Axes(void)
   glEnd();
 }
 
-float asdf = 128.0f;
-
 static const float *
 matrix_at(const float *mat, size_t x, size_t y, size_t w)
 {
@@ -121,9 +114,9 @@ matrix_point_at(const Point3f *mat, size_t x, size_t y, size_t w)
 }
 
 static void
-drawpoints(const std::vector<Point3f> &v)
+drawpoints(const std::vector<Point3f> &v, size_t width)
 {
-  auto w = static_cast<size_t>(data_header.width);
+  auto w = width;
   size_t i = 0;
   size_t j = 0;
   constexpr float scale_factor_depth = 1.0f;
@@ -142,7 +135,7 @@ drawpoints(const std::vector<Point3f> &v)
       if (std::isnan(p.z))
         continue;
 
-      float x = p.x * scale_factor_width, y = -(p.y * scale_factor_height),
+      float x = p.x * scale_factor_width, y = p.y * scale_factor_height,
             z = p.z * scale_factor_depth;
 
       glVertex3f(x,y,z);
@@ -169,7 +162,8 @@ RenderScene(void)
             viewer_up[2]);
   Axes();
 
-  drawpoints(points);
+  auto [_, points, width] = context3D.get_points();
+  drawpoints(points, width);
 
   glFlush();
   glutSwapBuffers();
@@ -248,7 +242,7 @@ Motion(GLsizei x, GLsizei y)
 static void
 Keyboard(unsigned char key, int x, int y)
 {
-  constexpr double camera_speed = 0.5f;
+  constexpr double camera_speed = 0.2f;
 
   switch (key)
   {
@@ -310,107 +304,17 @@ Keyboard(unsigned char key, int x, int y)
   RenderScene();
 }
 
-static void
-usage(int argc, char **argv)
+void
+init3d()
 {
-  fmt::print("Usage: {} <raw data file>\n", argv[0]);
-}
-
-int
-read_all(int fd, void *output, size_t size)
-{
-  auto begin = static_cast<char *>(output);
-  auto end = begin + size;
-
-  while (begin != end)
-  {
-    auto ret = read(fd, begin, end - begin);
-
-    if (ret <= 0)
-    {
-      perror("Error while reading file");
-      return ret;
-    }
-
-    begin += ret;
-  }
-
-  return 0;
-}
-
-int
-main(int argc, char **argv)
-{
-
-  if (argc != 2)
-  {
-    usage(argc, argv);
-    return 1;
-  }
-
-  int fd = open(argv[1], 0, O_RDONLY);
-
-  if (fd == -1)
-  {
-    perror(fmt::format("Failed to open {}", argv[1]).c_str());
-    return 2;
-  }
-
-  struct stat fstats;
-  if (fstat(fd, &fstats))
-  {
-    close(fd);
-    perror("Failed to get info about opened file");
-    return 3;
-  }
-
-  if (read_all(fd, &data_header, sizeof(data_header)))
-  {
-    close(fd);
-    perror("Error while reading file");
-    return 4;
-  }
-
-  auto raw_data_size = fstats.st_size - sizeof(data_header);
-  auto data_count = raw_data_size / sizeof(Point3f);
-
-  points.resize(data_count);
-  char *output = reinterpret_cast<char *>(points.data());
-
-  if (read_all(fd, output, raw_data_size))
-  {
-    // close(fd); // let kernel clean this up
-    perror("Error while reading file");
-    return 4;
-  }
-
-  close(fd);
-
-  fmt::print("Info:\n"
-             "WIDTH: {}\n"
-             "CAM POS: {} {} {}\n"
-             "CAM ROT:\n"
-             "\t{} {} {}\n"
-             "\t{} {} {}\n"
-             "\t{} {} {}\n",
-             data_header.width,
-             data_header.camera_pos[0],
-             data_header.camera_pos[1],
-             data_header.camera_pos[2],
-             data_header.camera_rot[0],
-             data_header.camera_rot[1],
-             data_header.camera_rot[2],
-             data_header.camera_rot[3],
-             data_header.camera_rot[4],
-             data_header.camera_rot[5],
-             data_header.camera_rot[6],
-             data_header.camera_rot[7],
-             data_header.camera_rot[8]);
+  int argc = 0;
+  char *argv_ = nullptr;
+  char **argv = &argv_;
 
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
   glutInitWindowSize(300, 300);
-  glutCreateWindow("kinect 3dview");
+  glutCreateWindow("3dview");
 
   glutDisplayFunc(RenderScene);
   glutReshapeFunc(ChangeSize);
