@@ -133,10 +133,6 @@ void calibrateAruco()
 
   cv::calibrateCamera(objpoints, imgpoints, cv::Size(color_height, color_width), cameraMatrix, distCoeffs, R, T);
 
-  std::cout << "cameraMatrix : " << cameraMatrix << std::endl;
-  std::cout << "distCoeffs : " << distCoeffs << std::endl;
-  std::cout << "Rotation vector : " << R << std::endl;
-  std::cout << "Translation vector : " << T << std::endl;
 }
 
 void findAruco(const cv::Mat &f)
@@ -333,6 +329,9 @@ main(int argc, char **argv)
        calibrateAruco(); 
        arucoCalibrated = true;
       }
+      break;
+      case'l':
+
       break;
       case 'r':
       case 'o': // find object depth

@@ -308,12 +308,12 @@ Keyboard(unsigned char key, int x, int y)
       glm::vec3 tvec;
 
       switch(key) {
-        case 'h': tvec = glm::vec3(tspeed, 0,0);
-        case 'j': tvec = glm::vec3(0,-tspeed,0);
-        case 'k': tvec = glm::vec3(0,tspeed,0);
-        case 'l': tvec = glm::vec3(-tspeed, 0,0);
-        case 'y': tvec = glm::vec3(0,0,tspeed);
-        case 'n': tvec = glm::vec3(0,0,-tspeed);
+        case 'h': tvec = glm::vec3(tspeed, 0,0);break;
+        case 'j': tvec = glm::vec3(0,-tspeed,0);break;
+        case 'k': tvec = glm::vec3(0,tspeed,0);break;
+        case 'l': tvec = glm::vec3(-tspeed, 0,0);break;
+        case 'y': tvec = glm::vec3(0,0,tspeed);break;
+        case 'n': tvec = glm::vec3(0,0,-tspeed);break;
       }
 
       auto [_1, points, _2] = context3D.get_points_cam1();
@@ -329,12 +329,12 @@ Keyboard(unsigned char key, int x, int y)
       glm::vec3 tvec;
 
       switch(key) {
-        case 'H': tvec = glm::vec3(tspeed, 0,0);
-        case 'J': tvec = glm::vec3(0,-tspeed,0);
-        case 'K': tvec = glm::vec3(0,tspeed,0);
-        case 'L': tvec = glm::vec3(-tspeed, 0,0);
-        case 'Y': tvec = glm::vec3(0,0,tspeed);
-        case 'N': tvec = glm::vec3(0,0,-tspeed);
+        case 'H': tvec = glm::vec3(tspeed, 0,0);break;
+        case 'J': tvec = glm::vec3(0,-tspeed,0);break;
+        case 'K': tvec = glm::vec3(0,tspeed,0); break;
+        case 'L': tvec = glm::vec3(-tspeed, 0,0);break;
+        case 'Y': tvec = glm::vec3(0,0,tspeed); break;
+        case 'N': tvec = glm::vec3(0,0,-tspeed);break;
       }
 
       auto [_1, points, _2] = context3D.get_points_cam2();

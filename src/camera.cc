@@ -13,11 +13,11 @@ namespace farsight {
       point.y += tvec.y;
       point.z += tvec.z;
 
-      auto rotated = rot * glm::vec3{point.x, point.y, point.z};
+     // auto rotated = rot * glm::vec3{point.x, point.y, point.z};
 
-      point.x = rotated.x;
-      point.y = rotated.y;
-      point.z = rotated.z;
+     // point.x = rotated.x;
+     // point.y = rotated.y;
+     // point.z = rotated.z;
     }
   }
 
