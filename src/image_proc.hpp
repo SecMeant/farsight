@@ -53,6 +53,12 @@ public:
     return distance;
   }
 
+  const bbox&
+  getDetectedBox(int kinectID, objectType t)
+  {
+    return config[kinectID].objects[to_underlying(t)].area;
+  }
+
   const libfreenect2::Frame*
   getDepthFrame(int kinectID, objectType t)
   {
@@ -86,12 +92,14 @@ public:
       auto &c = config[kinectID];
       img.copyTo(c.img_base);
   }
+
   void
   setNearestPoint(int kinectID, farsight::Point3f &p)
   {
     auto &c = config[kinectID].objects[to_underlying(objectType::MEASURED_OBJ)];
     c.nearest_point = p;
   }
+
   const farsight::Point3f&
   getNearestPoint(int kinectID)
   {

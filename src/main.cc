@@ -38,6 +38,10 @@ struct shared_t
 static farsight::postprocessing::Stage1 stage1(depth_width, depth_height);
 
 constexpr int waitTime = 50;
+
+const int floor_level_max = 1000;
+int floor_level_raw;
+
 // Defining the dimensions of checkerboard
 static int CHECKERBOARD[2]{ 8, 6 };
 static cv::Mat cameraMatrix, distCoeffs, R, T;
@@ -105,7 +109,7 @@ mouse_event_handler(int event, int x, int y, int flags, void *userdata)
     std::scoped_lock lck(shared->lock);
     shared->reg.getPointXYZ(&depth_frame_cpy, y, x, p.x, p.y, p.z);
     pos = y * depth_width + x;
-  fmt::print("{} {}\n", x, y);
+    fmt::print("{} {}\n", x, y);
     fmt::print(
       "Value: {} {} {} {}\n", depth_frame_cpy.data[pos], p.x, p.y, p.z);
     interpol[inter_id] = {x,y};
@@ -289,14 +293,12 @@ generateScene(const libfreenect2::Registration &reg,
 farsight::PointArray
 createPointMaping(const libfreenect2::Registration &reg,
                   const libfreenect2::Frame *f,
-                  const byte *filtered,
                   const bbox &b,
                   int cam,
                   double distance)
 {
   farsight::Point3f p{ 0, 0, 0 };
   farsight::PointArray pointMap;
-  int pos;
 
   if (!tvecs.size() || !rvecs.size())
     return {};
@@ -324,13 +326,6 @@ createPointMaping(const libfreenect2::Registration &reg,
   {
     for (int c = b.x; c < b.x + b.w; c++)
     {
-      pos = r * b.w + c;
-      if (filtered[pos] == 255)
-      {
-        pointMap.push_back({ nan, nan, nan });
-        continue;
-      }
-
       reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
       if (p.z > distance  || p.y >= floor_level)
       {
@@ -351,6 +346,12 @@ createPointMaping(const libfreenect2::Registration &reg,
 
   farsight::update_points_cam2(pointMap, depth_width);
   return farsight::get_translated_points_cam2();
+}
+
+static void on_trackbar( int, void* )
+{
+    floor_level = double(floor_level_raw) / floor_level_max;
+    fmt::print("CURRENT FLOOR LEVE {}\n" ,floor_level);
 }
 
 int
@@ -383,7 +384,8 @@ main(int argc, char **argv)
   shared_t shared{ std::mutex(), reg };
   cv::namedWindow(wndname2, cv::WINDOW_AUTOSIZE);
   cv::setMouseCallback(wndname2, mouse_event_handler, &shared);
-
+  namedWindow("floor", WINDOW_AUTOSIZE); // Create Window
+  createTrackbar("Floor level", "floor", &floor_level_raw, floor_level_max, on_trackbar);
   objectType t;
   byte *depth_backup = nullptr;
   while (continue_flag.test_and_set() and c != 'q')
@@ -475,7 +477,7 @@ main(int argc, char **argv)
       }
       break;
       case 'r':
-      case 'o': // find object depth
+      case 'o': 
       {
         dec.saveDepthFrame(selectedKinnect, t, &depth_frame_cpy);
         auto detectedBox = dec.detect(
@@ -484,7 +486,6 @@ main(int argc, char **argv)
         double dist = distance - np.z;
         auto realPoints = createPointMaping(reg,
                                             &depth_frame_cpy,
-                                            depth->data,
                                             detectedBox,
                                             selectedKinnect,
                                             dist);
@@ -493,6 +494,18 @@ main(int argc, char **argv)
           selectedKinnect, t, image_depth, detectedBox, realPoints);
         dec.displayCurrectConfig();
         dec.calcBiggestComponent(t);
+      }
+      break;
+      case 'x':
+      {
+        auto detectedBox = dec.getDetectedBox(selectedKinnect, t);
+        const auto &np = dec.getNearestPoint(selectedKinnect == 0 ? 1 : 0);
+        double dist = distance - np.z;
+        auto realPoints = createPointMaping(reg,
+                                            &depth_frame_cpy,
+                                            detectedBox,
+                                            selectedKinnect,
+                                            dist);
       }
       break;
       case '1':
