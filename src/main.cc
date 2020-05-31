@@ -431,7 +431,7 @@ main(int argc, char **argv)
       if (c == 's')
       {
         const auto &tvec = tvecs[0];
-        farsight::Point3f pos = { tvec[0], tvec[1], tvec[2] };
+        farsight::Point3f pos( tvec[0], tvec[1], tvec[2] );
         dec.setCameraPos(selectedKinnect, pos);
         distance = dec.calcMaxDistance();
         fmt::print("Curent distance is {}\n", distance);
