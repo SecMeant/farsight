@@ -12,7 +12,7 @@
 
 #include <GL/gl.h>
 #include <GL/glut.h>
-
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/rotate_vector.hpp>
@@ -140,6 +140,8 @@ drawpoints(const CameraShot &cs)
       p.y *= (-1.0f);
 
       p = glm::rotateX(p, cs.angleRotX);
+      p = glm::rotateY(p, cs.angleRotY);
+      p = glm::rotateZ(p, cs.angleRotZ);
 
       glVertex3f(p.x,p.y,p.z);
     }
@@ -404,6 +406,28 @@ Keyboard(unsigned char key, int x, int y)
           cs.angleRotY += rotangle;
           break;
         case 'z':
+          cs.angleRotZ += rotangle;
+          break;
+      }
+
+      fmt::print("CAM1 ROT: {} {} {}\n", cs.angleRotX, cs.angleRotY, cs.angleRotZ);
+      break;
+    }
+
+    case 'X':
+    case 'Y':
+    case 'Z': {
+      auto [lck, cs] = context3D.get_points_cam2();
+
+      switch (key)
+      {
+        case 'X':
+          cs.angleRotX += rotangle;
+          break;
+        case 'Y':
+          cs.angleRotY += rotangle;
+          break;
+        case 'Z':
           cs.angleRotZ += rotangle;
           break;
       }

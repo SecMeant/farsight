@@ -54,8 +54,8 @@ template<typename Format>
 farsight::Point3f
 findNearestPoint(const bbox &area, const byte *frame, const byte *filtered)
 {
-  constexpr int mm_to_cm = 10;
-  farsight::Point3f dep;
+  constexpr int MM_TO_M = 1000;
+  farsight::Point3f dep {0,0, std::numeric_limits<float>::max()};
   int pos = area.y * area.w + area.x;
   const auto *depth = reinterpret_cast<const Format *>(frame);
 
@@ -65,14 +65,14 @@ findNearestPoint(const bbox &area, const byte *frame, const byte *filtered)
     auto y = (area.y + (i / area.w));
     pos = y * area.w + x;
 
-    if (dep.z > depth[pos] and depth[pos] > 0.0 and
-        !std::isnan(depth[pos]) and filtered[pos] != 255)
+    if (dep.z > depth[pos] and depth[pos] > 1.0 and
+        !std::isnan(depth[pos]))
     {
-      dep.z= fabs(depth[pos]);
+      dep.z= depth[pos];
       dep.x= x;
       dep.y= y * area.w;
     }
   }
-  dep.z= dep.z;
+  dep.z= dep.z/MM_TO_M;
   return dep;
 }

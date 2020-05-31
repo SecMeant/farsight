@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <memory>
 #include <opencv2/core/types.hpp>
+#include <libfreenect2/frame_listener.hpp>
 #include "types.h"
 
 using pointArray = std::vector<farsight::Point3f>;
@@ -25,10 +26,10 @@ struct object_t
     farsight::Point3f nearest_point;
     cv::Mat imgDepth = cv::Mat::zeros(
         cv::Size(depth_width, depth_height), CV_8UC1); 
-    std::unique_ptr<byte[]> depthFrame =
-      std::make_unique<byte[]>(total_size_depth);
+    libfreenect2::Frame depthFrame =
+      libfreenect2::Frame(depth_width, depth_height, sizeof(float));
     pointArray pointCloud;
-    bool configured=false;
+    bool configured = false;
 };
 
 constexpr int objectsPerCamera = 2;
@@ -36,8 +37,10 @@ using objectArray = std::array<object_t, objectsPerCamera>;
 
 struct cameraConfig
 {
-    farsight::Point3f camPose;
+    farsight::Point3f camPose {0,0,0};
     cv::Mat img_base;
+    libfreenect2::Frame base =
+      libfreenect2::Frame(depth_width, depth_height, sizeof(float));
     objectArray objects;
     int camSpan;
 };

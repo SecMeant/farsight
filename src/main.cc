@@ -22,6 +22,7 @@
 #include "camera.h"
 #include "types.h"
 #include <thread>
+#include<chrono>
 
 extern "C"
 {
@@ -41,16 +42,15 @@ static int CHECKERBOARD[2]{8,6};
 static cv::Mat cameraMatrix, distCoeffs, R, T;
 static std::vector<cv::Vec3d> rvecs, tvecs;
 
-static libfreenect2::Frame md_frame = libfreenect2::Frame(depth_width, depth_height, sizeof(float));
+static libfreenect2::Frame depth_frame_cpy = libfreenect2::Frame(depth_width, depth_height, sizeof(float));
 static bool arucoCalibrated = false;
 const char *wndname  = "wnd";
 const char *wndname2 = "wnd2";
 const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
 const char *wndaruco = "aruco";
-const char *arucoConfigPath = "../../,,/aruco/aruco.conf";
+const char *arucoConfigPath ="../../../aruco/aruco.conf" ;
 
-constexpr int avg_max_number = 10;
 std::atomic_flag continue_flag;
 std::vector<cv::String> images;
 std::vector<cv::Mat> arucoDict;
@@ -76,9 +76,9 @@ mouse_event_handler( int event, int x, int y, int flags, void *userdata )
     farsight::Point3f p;
     int pos;
     std::scoped_lock lck(shared->lock);
-    shared->reg.getPointXYZ(&md_frame, y, x, p.x, p.y, p.z);
+    shared->reg.getPointXYZ(&depth_frame_cpy, y, x, p.x, p.y, p.z);
     pos = y*depth_width + x;
-    fmt::print("Value: {} {} {} {}\n",md_frame.data[pos], p.x, p.y, p.z);
+    fmt::print("Value: {} {} {} {}\n",depth_frame_cpy.data[pos], p.x, p.y, p.z);
   }
 }
 
@@ -155,10 +155,6 @@ void findAruco(const cv::Mat &f)
   if (ids.size() > 0) {
     cv::aruco::drawDetectedMarkers(imageCopy, corners, ids);
     cv::aruco::estimatePoseSingleMarkers(corners, 0.40, cameraMatrix, distCoeffs, rvecs, tvecs);
-    if(tvecs.size()  && rvecs.size())
-    {
-        fmt::print("{} {} {} \n", tvecs[0][0], tvecs[0][1],tvecs[0][2]);
-    }
     // draw axis for each marker
     for(int i=0; i<ids.size(); i++)
         cv::aruco::drawAxis(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.20);
@@ -195,7 +191,6 @@ void generateScene(const libfreenect2::Registration &reg,
     }
  }
 
- float *ud = reinterpret_cast<float*>(f->data);
  int pos;
  for(int r=0; r < f->height; r++)
  {
@@ -226,24 +221,64 @@ pointArray
 createPointMaping(const libfreenect2::Registration &reg,
                   const libfreenect2::Frame *f,
                   const byte *filtered,
-                  const bbox &b)
+                  const bbox &b,
+                  int cam,
+                  double distance)
 {
- farsight::Point3f p;
- pointArray map;
+ farsight::Point3f p{0,0,0};
+ pointArray pointMap;
  int pos;
+
+ if(!tvecs.size() || !rvecs.size())
+    return{};
+
+ float nan = NAN;
+
+ auto& tvec = tvecs[0];
+ glm::vec3 gtvec = {tvec[0], tvec[1], tvec[2]};
+
+ cv::Mat r_mat;
+ cv::Rodrigues(rvecs[0], r_mat);
+ cv::Mat translation_matrix = r_mat.inv();
+
+ glm::mat3x3 grmat;
+ for(int r = 0; r< translation_matrix.rows; r++)
+ {
+    for( int c = 0; c < translation_matrix.cols; c++)
+    {
+        auto d = translation_matrix.at<double>(r,c);
+        grmat[r][c] = d;
+    }
+ }
+ fmt::print("{} {} {} {}", b.x, b.y, b.w, b.h);
  for(int r=b.y; r < b.y+b.h; r++)
  {
    for(int c=b.x; c < b.x+b.w; c++)
    {
     pos = r*b.w + c;
     if(filtered[pos] == 255)
+    {
+      pointMap.push_back({nan,nan,nan});
       continue;
+    }
 
     reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-    map.push_back({p.x*M_TO_MM, p.y*M_TO_MM, p.z*M_TO_MM});
+    if(p.z > distance)
+    {
+      pointMap.push_back({nan,nan,nan});
+      continue;
+    }
+
+    pointMap.push_back({p.x, p.y, p.z});
    }
  }
- return map;
+
+ farsight::camera2real(pointMap, gtvec, grmat);
+ if(cam == 0)
+     farsight::update_points_cam1(pointMap, depth_width);
+ else
+     farsight::update_points_cam2(pointMap, depth_width);
+ return pointMap;
 }
 
 int
@@ -258,11 +293,7 @@ main(int argc, char **argv)
   libfreenect2::Frame *rgb, *ir, *depth; 
 
   int c = 0;
-  bbox boxAverage;
-  farsight::Point3f nearestPointAvg;
-  nearestPointAvg.z= 0;
-
-  int avg_number = 0; // 1?
+  double distance;
   int selectedKinnect = 0;
   std::thread gl_thread(farsight::init3d);
   gl_thread.detach();
@@ -286,34 +317,34 @@ main(int argc, char **argv)
     rgb = k_dev.frames[libfreenect2::Frame::Color];
     ir = k_dev.frames[libfreenect2::Frame::Ir];
     depth = k_dev.frames[libfreenect2::Frame::Depth];
-    memcpy(md_frame.data, depth->data, depth_width*depth_height*sizeof(float)); 
-    auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-    cv::Mat gray;
-    cv::cvtColor(image_rgb, gray,cv::COLOR_BGR2GRAY);
+    memcpy(depth_frame_cpy.data, depth->data, depth_width*depth_height*sizeof(float)); 
     
     if (c == 'r')
     {
       t = objectType::REFERENCE_OBJ;
-      dec.saveDepthFrame(selectedKinnect, t, depth);
     }else if(c == 'o')
     {
       t = objectType::MEASURED_OBJ;
-      dec.saveDepthFrame(selectedKinnect, t, depth);
     }
 
+    cv::Mat gray;
+    auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
+    cv::cvtColor(image_rgb, gray,cv::COLOR_BGR2GRAY);
     if(arucoCalibrated == true)
     {
         findAruco(gray);
         if(c == 's')
         {
+          const auto& tvec = tvecs[0];
+          farsight::Point3f pos = {tvec[0], tvec[1], tvec[2]};
+          dec.setCameraPos(selectedKinnect, pos);
+          distance = dec.calcMaxDistance();
+          fmt::print("Curent distance is {}\n", distance);
           generateScene(reg, depth, selectedKinnect);
         }
     }
-
     depthProcess(depth);
-
     conv32FC1To8CU1(depth->data, depth->height * depth->width);
-
     auto image_depth =
       cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
 
@@ -321,23 +352,18 @@ main(int argc, char **argv)
     {
       case 'b': {
         fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
-        dec.setBaseImg(selectedKinnect, image_depth);
-        dec.displayCurrectConfig();
-      }
-      break;
-      case ' ':
-      {
-        cv::glob("../../../aruco/*.jpg", images);
+        dec.saveBaseDepthImg(selectedKinnect, image_depth);
       }
       break;
       case 'c':
       {
+       cv::glob("../../../aruco/*.jpg", images);
        fmt::print("calibration started");
        calibrateAruco(); 
        arucoCalibrated = true;
       }
       break;
-      case'l':
+      case 'l':
       {
           cv::FileStorage storage(arucoConfigPath, cv::FileStorage::READ);
           storage["cameraMatrix"] >> cameraMatrix;
@@ -348,34 +374,27 @@ main(int argc, char **argv)
           arucoCalibrated = true;
       }
       break;
+      case 'n':
+      {
+          auto detectedBox = dec.detect(
+            selectedKinnect, depth->data, total_size_depth, image_depth);
+          auto nearestPoint = findNearestPoint<float>(
+            detectedBox, depth_frame_cpy.data, depth->data);
+          dec.setNearestPoint(selectedKinnect, nearestPoint);
+          fmt::print("nearest point {}",nearestPoint.z);
+      }
+      break;
       case 'r':
       case 'o': // find object depth
         {
+          dec.saveDepthFrame(selectedKinnect, t, &depth_frame_cpy);
           auto detectedBox = dec.detect(
             selectedKinnect, depth->data, total_size_depth, image_depth);
-          auto *frameDepth = dec.getDepthFrame(selectedKinnect, t);
-          auto nearestPoint = findNearestPoint<float>(
-            detectedBox, frameDepth, depth->data);
-          boxAverage += detectedBox;
-          nearestPointAvg.z += nearestPoint.z;
-
-          if (avg_number < avg_max_number)
-          {
-            avg_number++;
-            k_dev.releaseFrames();
-            continue;
-          }
-          nearestPoint.z = nearestPointAvg.z / avg_max_number;
-          detectedBox.w = boxAverage.w / avg_max_number;
-          detectedBox.y = boxAverage.h / avg_max_number;
-          nearestPointAvg.z= 0;
-          boxAverage.reset();
-          avg_number = 0;
-          auto realPoints = createPointMaping(reg, depth, depth->data, detectedBox);
-          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, nearestPoint, realPoints);
-          dec.translate(t);
+          const auto &np = dec.getNearestPoint(selectedKinnect == 0 ? 1 : 0);
+          double dist = distance - np.z;
+          auto realPoints = createPointMaping(reg, &depth_frame_cpy, depth->data, detectedBox, selectedKinnect, dist);
+          dec.setConfig(selectedKinnect, t, image_depth, detectedBox, realPoints);
           dec.displayCurrectConfig();
-          dec.calcBiggestComponent();
         }
         break;
       case '1':
@@ -390,6 +409,9 @@ main(int argc, char **argv)
 
     cv::imshow(wndname2, image_depth);
     c = cv::waitKey(waitTime);
+    if(c == 'b' || c == 'n' || c == 'o' || c == 'r')
+        std::this_thread::sleep_for (std::chrono::seconds(4));
+
     k_dev.releaseFrames();
   }
   k_dev.close();
