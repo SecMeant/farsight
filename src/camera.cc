@@ -51,8 +51,6 @@ namespace farsight {
     // Camera position relative to found face
     glm::vec3 camera_pos = tvec * -1.0f;
 
-    glm::mat3x4 camera_rot = rot
-
     // Apply face offset to get camera position relative to front face.
     camera_pos += calculate_face_offset(id);
 
