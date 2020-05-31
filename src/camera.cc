@@ -33,7 +33,7 @@ namespace farsight {
     assert(id < std::size(faces_position) && id > 0);
   }
 
-  constexpr static glm::vec3
+  static glm::vec3
   calculate_face_offset(int id)
   {
     check_face_id(id);
