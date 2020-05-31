@@ -30,7 +30,7 @@ namespace farsight {
   check_face_id(int id)
   {
     // 0 is bottom face and cannot be seen
-    assert(id < std::size(faces_position) && id > 0);
+    assert(id < std::size(faces_position) && id >= 0 && id != 3);
   }
 
   static glm::vec3
@@ -50,6 +50,8 @@ namespace farsight {
 
     // Camera position relative to found face
     glm::vec3 camera_pos = tvec * -1.0f;
+
+    glm::mat3x4 camera_rot = rot
 
     // Apply face offset to get camera position relative to front face.
     camera_pos += calculate_face_offset(id);
