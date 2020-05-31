@@ -10,7 +10,7 @@ namespace farsight {
 #endif
 
   // clang-format off
-  constexpr glm::vec3 faces_position[6] {
+  const glm::vec3 faces_position[6] {
     [0] = { 0.00f,-0.25f, 0.25f },
     [1] = { 0.00f, 0.00f, 0.00f },
     [2] = { 0.00f, 0.25f, 0.25f },
@@ -24,7 +24,7 @@ namespace farsight {
 #pragma clang diagnostic pop
 #endif
 
-  constexpr glm::vec3 front_face = faces_position[1];
+  const glm::vec3 front_face = faces_position[1];
 
   constexpr static void
   check_face_id(int id)
