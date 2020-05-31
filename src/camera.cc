@@ -1,9 +1,15 @@
+#include <cassert>
+
 #include "camera.h"
 
 namespace farsight {
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc99-designator"
+
   // clang-format off
-  glm::vec3 faces_position[6] {
+  constexpr glm::vec3 faces_position[6] {
     [0] = { 0.00f, 0.00f, 0.00f },
     [1] = { 0.00f, 0.25f,-0.25f },
     [2] = { 0.00f, 0.00f,-0.50f },
@@ -14,12 +20,19 @@ namespace farsight {
   };
   // clang-format on
 
+#pragma clang diagnostic pop
+#endif
+
+  constexpr glm::vec3 front_face = faces_position[1];
+
   void
   camera2real(std::vector<Point3f> &points,
               glm::vec3 tvec,
               glm::mat3x3 rot,
               int id)
   {
+    assert(id < std::size(faces_position) && id >= 0);
+
     tvec = tvec * (-1.0f);
 
     for (auto &point : points) {
@@ -27,11 +40,7 @@ namespace farsight {
       point.y += tvec.y;
       point.z += tvec.z;
 
-     // auto rotated = rot * glm::vec3{point.x, point.y, point.z};
-
-     // point.x = rotated.x;
-     // point.y = rotated.y;
-     // point.z = rotated.z;
+      point = rot * point;
     }
   }
 
