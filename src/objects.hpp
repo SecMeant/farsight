@@ -7,7 +7,6 @@
 #include <libfreenect2/frame_listener.hpp>
 #include "types.h"
 
-using pointArray = std::vector<farsight::Point3f>;
 
 enum class objectType : unsigned int
 {
@@ -28,7 +27,7 @@ struct object_t
         cv::Size(depth_width, depth_height), CV_8UC1); 
     libfreenect2::Frame depthFrame =
       libfreenect2::Frame(depth_width, depth_height, sizeof(float));
-    pointArray pointCloud;
+    farsight::PointArray pointCloud;
     bool configured = false;
 };
 

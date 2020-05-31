@@ -14,7 +14,9 @@ namespace farsight::postprocessing {
   {
     Stage1(size_t width, size_t height)
       : image(width, height, sizeof(PixelType))
-    {}
+    {
+      reset();
+    }
 
     void
     apply(const libfreenect2::Frame &frame)
@@ -22,17 +24,26 @@ namespace farsight::postprocessing {
       assert(frame.width == image.width);
       assert(frame.height == image.height);
 
-      auto new_data = frame.data;
-      auto data = image.data;
+      auto new_data = reinterpret_cast<float*>(frame.data);
+      auto data = reinterpret_cast<float*>(image.data);
 
-      for (auto i = frame.width * frame.height - 1; i >= 0; --i)
+      for (size_t i = 0; i < frame.width * frame.height ; ++i)
       {
-        if (std::isnan(data[i]))
+        if (std::isnan(data[i]) || data[i] < 0.0f || std::isinf(data[i]))
           data[i] = new_data[i];
       }
     }
+    void
+    reset()
+    {
+      auto *data = reinterpret_cast<PixelType *>(image.data);
+      for (int i = 0; i < image.width * image.height; i++)
+      {
+        data[i] = NAN;
+      }
+    }
 
-    const FrameType&
+    const FrameType &
     get()
     {
       return image;
@@ -46,4 +57,4 @@ namespace farsight::postprocessing {
 
   void
   blur(FrameType &frame);
-}; // namespace postprocessing
+}; // namespace farsight::postprocessing

@@ -68,7 +68,7 @@ detector::setConfig(int kinectID,
                     objectType t,
                     const cv::Mat &img,
                     const bbox &a,
-                    const pointArray &pointCloud)
+                    const farsight::PointArray &pointCloud)
 {
   auto &c =config[kinectID].objects[to_underlying(t)];
   c.area = a;
@@ -78,34 +78,16 @@ detector::setConfig(int kinectID,
 }
 
 void
-detector::translate(objectType t)
+detector::calcBiggestComponent(objectType t)
 {
-  pointArray map;
   auto &c1 =config[0].objects[to_underlying(t)];
   auto &c2 =config[1].objects[to_underlying(t)];
-  // just for debug
-  //if(!(c1.configured && c2.configured))
-   // return;
-  for (const auto &p : c1.pointCloud)
-  {
-    map.push_back(p);
-  }
 
-  for (const auto &p : c2.pointCloud)
-  {
-    map.push_back(p);
-  }
-  map_ = std::move(map);
-}
-
-void
-detector::calcBiggestComponent()
-{
-  auto &c1 =config[0].objects[to_underlying(objectType::MEASURED_OBJ)];
-  auto &c2 =config[1].objects[to_underlying(objectType::MEASURED_OBJ)];
-  //if(!(c1.configured && c2.configured))
-   // return;
-
+  farsight::PointArray map_;
+  std::copy(
+    c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_));
+  std::copy(
+    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
   std::vector<cv::Point2f> pointsCloudTop;
   std::vector<cv::Point2f> pointsCloudFront;
   for(auto &p :map_)
@@ -118,8 +100,7 @@ detector::calcBiggestComponent()
   auto obj_width = rectTop.size.width;
   auto obj_height = rectFront.size.height;
   auto obj_length = rectTop.size.height;
-
-  fmt::print("{} {} {}", obj_width, obj_height, obj_length);
+  fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
 }
 
 void

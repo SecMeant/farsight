@@ -10,6 +10,7 @@
 #include <glm/gtx/rotate_vector.hpp>
 
 namespace farsight {
+ 
   struct Point3f
   {
     float x, y, z;
@@ -34,6 +35,30 @@ namespace farsight {
     }
   };
 
+  struct Point2i
+  {
+    int x, y;
+
+    Point2i() = default;
+
+    Point2i(glm::vec3 v)
+    : x(v.x)
+    , y(v.y)
+    {}
+
+    Point2i(int x, int y)
+    : x(x)
+    , y(y)
+    {}
+
+    operator glm::vec2() const
+    {
+      return glm::vec2{x,y};
+    }
+  };
+
+  using PointArray = std::vector<Point3f>;
+
   struct CameraShot
   {
     size_t width = 1;
@@ -46,7 +71,7 @@ namespace farsight {
   {
   public:
     using PointInfoLocked = std::tuple<std::unique_lock<std::mutex>, CameraShot&>;
-    using PointInfo = std::vector<Point3f>;
+    using PointInfo = PointArray;
 
     void
     update_cam1(std::vector<Point3f> &&points, size_t width)

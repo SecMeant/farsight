@@ -22,9 +22,9 @@ public:
             const objectType t,
             const cv::Mat &imgDepth,
             const bbox &a,
-            const pointArray &flattened);
+            const farsight::PointArray &flattened);
   void
-  calcBiggestComponent();
+  calcBiggestComponent(objectType t);
   void
   displayCurrectConfig();
   void
@@ -109,6 +109,5 @@ private:
   cv::Mat configScreen;
   cv::Rect matRoi;
   farsight::Point3f cameraOffsets;
-  pointArray map_;
   double distance = 0;
 };
