@@ -36,6 +36,7 @@ struct shared_t
   libfreenect2::Registration &reg;
 };
 static farsight::postprocessing::Stage1 stage1(depth_width, depth_height);
+std::vector<int> ids;
 
 constexpr int waitTime = 50;
 
@@ -211,7 +212,6 @@ findAruco(const cv::Mat &f)
     cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
   cv::Mat imageCopy;
   f.copyTo(imageCopy);
-  std::vector<int> ids;
   std::vector<std::vector<cv::Point2f>> corners;
   cv::aruco::detectMarkers(f, dictionary, corners, ids);
   // if at least one marker detected
@@ -222,7 +222,7 @@ findAruco(const cv::Mat &f)
       corners, 0.40, cameraMatrix, distCoeffs, rvecs, tvecs);
   if (tvecs.size() && rvecs.size())
   {
-    fmt::print("{} {} {}\n", tvecs[0][0],tvecs[0][1],tvecs[0][2] ); 
+    //fmt::print("{} {} {}\n", tvecs[0][0],tvecs[0][1],tvecs[0][2] ); 
   }
     // draw axis for each marker
     for (int i = 0; i < ids.size(); i++)
@@ -281,7 +281,7 @@ generateScene(const libfreenect2::Registration &reg,
     }
   }
   fmt::print("Updating opngl");
-  farsight::camera2real(pointMap, gtvec, grmat);
+  farsight::camera2real(pointMap, gtvec, grmat, ids[0]);
   if (cam == 0)
     farsight::update_points_cam1(pointMap, depth_width);
   else
@@ -337,7 +337,7 @@ createPointMaping(const libfreenect2::Registration &reg,
     }
   }
 
-  farsight::camera2real(pointMap, gtvec, grmat);
+  farsight::camera2real(pointMap, gtvec, grmat ,ids[0]);
   if (cam == 0)
   {
     farsight::update_points_cam1(pointMap, depth_width);
@@ -347,6 +347,7 @@ createPointMaping(const libfreenect2::Registration &reg,
   farsight::update_points_cam2(pointMap, depth_width);
   return farsight::get_translated_points_cam2();
 }
+
 
 static void on_trackbar( int, void* )
 {
@@ -435,7 +436,6 @@ main(int argc, char **argv)
         dec.setCameraPos(selectedKinnect, pos);
         distance = dec.calcMaxDistance();
         fmt::print("Curent distance is {}\n", distance);
-        generateScene(reg, depth, selectedKinnect);
       }
     }
     depthProcess(depth);
@@ -448,6 +448,7 @@ main(int argc, char **argv)
       case 'b': {
         fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
         dec.saveBaseDepthImg(selectedKinnect, image_depth);
+        generateScene(reg, &depth_frame_cpy, selectedKinnect);
       }
       break;
       case 'c': {
@@ -498,14 +499,7 @@ main(int argc, char **argv)
       break;
       case 'x':
       {
-        auto detectedBox = dec.getDetectedBox(selectedKinnect, t);
-        const auto &np = dec.getNearestPoint(selectedKinnect == 0 ? 1 : 0);
-        double dist = distance - np.z;
-        auto realPoints = createPointMaping(reg,
-                                            &depth_frame_cpy,
-                                            detectedBox,
-                                            selectedKinnect,
-                                            dist);
+          farsight::set_floor_level(floor_level);
       }
       break;
       case '1':

@@ -2,6 +2,7 @@
 
 #include "camera.h"
 
+#include <fmt/format.h>
 namespace farsight {
 
 #if defined(__clang__)
@@ -48,11 +49,17 @@ namespace farsight {
   {
     check_face_id(id);
 
-    // Camera position relative to found face
-    glm::vec3 camera_pos = tvec * -1.0f;
+    // Get marker offset from camera
+    glm::vec3 camera_pos = tvec;
 
-    // Apply face offset to get camera position relative to front face.
+    // Apply relative face offset 
     camera_pos += calculate_face_offset(id);
+
+    // Get camera position relative to front marker (world 0,0,0)
+    camera_pos *= -1.0f;
+
+
+    fmt::print("Camera pos: {} {} {}", camera_pos.x, camera_pos.y, camera_pos.z);
 
     // Apply camera offset and rotation to all points.
     for (auto &point : points) {
@@ -60,7 +67,7 @@ namespace farsight {
       point.y += camera_pos.y;
       point.z += camera_pos.z;
 
-      point = rot * point;
+     // point = rot * point;
     }
   }
 

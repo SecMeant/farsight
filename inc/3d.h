@@ -88,4 +88,12 @@ namespace farsight {
     return context3D.get_translated_points_cam2();
   }
 
+  void
+  set_floor_level(float f)
+  {}
+
+  float
+  get_floor_level()
+  {return 0.0;}
+
 } // namespace farsight

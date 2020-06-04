@@ -92,9 +92,10 @@ detector::calcBiggestComponent(objectType t)
   std::vector<cv::Point2f> pointsCloudFront;
   for(auto &p :map_)
   {
-    pointsCloudTop.emplace_back(p.x, p.z);
-    pointsCloudFront.emplace_back(p.x, p.y);
+    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
+    pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
   }
+  fmt::print("{}, {}\n",pointsCloudTop.size(), pointsCloudFront.size());
   auto rectTop = cv::minAreaRect(pointsCloudTop);
   auto rectFront = cv::minAreaRect(pointsCloudFront);
   auto obj_width = rectTop.size.width;
