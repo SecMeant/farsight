@@ -143,6 +143,9 @@ drawpoints(const CameraShot &cs)
       p = glm::rotateY(p, cs.rvec.y);
       p = glm::rotateZ(p, cs.rvec.z);
 
+      if (p.y <= (FLOOR_BASE_Y + cs.floor_level))
+        continue;
+
       glVertex3f(p.x,p.y,p.z);
     }
 

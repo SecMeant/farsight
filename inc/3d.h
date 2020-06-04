@@ -89,11 +89,15 @@ namespace farsight {
   }
 
   inline void
-  set_floor_level(float f)
-  {}
+  set_floor_level(float level)
+  {
+    context3D.set_floor_level(level);
+  }
 
   inline float
   get_floor_level()
-  {return 0.0;}
+  {
+    return context3D.get_floor_level();
+  }
 
 } // namespace farsight

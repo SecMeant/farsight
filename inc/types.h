@@ -10,6 +10,8 @@
 #include <glm/gtx/rotate_vector.hpp>
 
 namespace farsight {
+
+  constexpr static float FLOOR_BASE_Y = -0.25;
  
   struct Point3f
   {
@@ -65,6 +67,7 @@ namespace farsight {
     std::vector<Point3f> points {{0,0,0}};
     glm::vec3 tvec {0.0f, 0.0f, 0.0f};
     glm::vec3 rvec {0.0f, 0.0f, 0.0f};
+    float floor_level = FLOOR_BASE_Y;
   };
 
   struct Context3D
@@ -121,6 +124,9 @@ namespace farsight {
         point = glm::rotateX(static_cast<glm::vec3>(point), rvec.x);
         point = glm::rotateY(static_cast<glm::vec3>(point), rvec.y);
         point = glm::rotateZ(static_cast<glm::vec3>(point), rvec.z);
+
+        if (point.y <= (FLOOR_BASE_Y + cam.floor_level))
+          point = {NAN, NAN, NAN};
       }
 
       return ret;
@@ -192,6 +198,23 @@ namespace farsight {
     {
       std::unique_lock lck{ this->mtx };
       this->camshot2.rvec = v;
+    }
+
+    void
+    set_floor_level(float level)
+    {
+      std::unique_lock lck{ this->mtx };
+      this->camshot1.floor_level = level;
+      this->camshot2.floor_level = level;
+    }
+
+    float
+    get_floor_level() const
+    {
+      std::unique_lock lck{ this->mtx };
+      assert(this->camshot1.floor_level == this->camshot2.floor_level);
+
+      return this->camshot1.floor_level;
     }
 
   private:
