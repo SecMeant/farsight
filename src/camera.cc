@@ -12,12 +12,12 @@ namespace farsight {
 
   // clang-format off
   const glm::vec3 faces_position[6] {
-    [0] = {-0.25f, 0.00f, 0.25f },
-    [1] = { 0.00f, 0.00f, 0.00f },
-    [2] = { 0.25f, 0.00f, 0.25f },
-    [3] = { 0.00f,-0.25f, 0.25f },
-    [4] = { 0.00f, 0.25f, 0.25f },
-    [5] = { 0.00f, 0.00f, 0.50f },
+    [0] = glm::vec3(-0.25f, 0.00f,-0.25f ),
+    [1] = glm::vec3( 0.00f, 0.00f,-0.00f ),
+    [2] = glm::vec3( 0.25f, 0.00f,-0.25f ),
+    [3] = glm::vec3( 0.00f,-0.25f,-0.25f ),
+    [4] = glm::vec3( 0.00f, 0.25f,-0.25f ),
+    [5] = glm::vec3( 0.00f, 0.00f,-0.50f ),
   };
   // clang-format on
 
@@ -30,7 +30,7 @@ namespace farsight {
   constexpr static void
   check_face_id(int id)
   {
-    // 0 is bottom face and cannot be seen
+    // 3 is bottom face and cannot be seen
     assert(id < std::size(faces_position) && id >= 0 && id != 3);
   }
 
@@ -58,8 +58,7 @@ namespace farsight {
     // Get camera position relative to front marker (world 0,0,0)
     camera_pos *= -1.0f;
 
-
-    fmt::print("Camera pos: {} {} {}", camera_pos.x, camera_pos.y, camera_pos.z);
+    fmt::print("Camera pos: {} {} {}\n", camera_pos.x, camera_pos.y, camera_pos.z);
 
     // Apply camera offset and rotation to all points.
     for (auto &point : points) {
