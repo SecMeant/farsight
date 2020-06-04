@@ -52,47 +52,47 @@ namespace farsight {
     return context3D.get_rvec_cam2();
   }
 
-  void
+  inline void
   set_tvec_cam1(glm::vec3 v)
   {
     context3D.set_tvec_cam1(v);
   }
 
-  void
+  inline void
   set_rvec_cam1(glm::vec3 v)
   {
     context3D.set_rvec_cam1(v);
   }
 
-  void
+  inline void
   set_tvec_cam2(glm::vec3 v)
   {
     context3D.set_tvec_cam2(v);
   }
 
-  void
+  inline void
   set_rvec_cam2(glm::vec3 v)
   {
     context3D.set_rvec_cam2(v);
   }
 
-  Context3D::PointInfo
+  inline Context3D::PointInfo
   get_translated_points_cam1()
   {
     return context3D.get_translated_points_cam1();
   }
 
-  Context3D::PointInfo
+  inline Context3D::PointInfo
   get_translated_points_cam2()
   {
     return context3D.get_translated_points_cam2();
   }
 
-  void
+  inline void
   set_floor_level(float f)
   {}
 
-  float
+  inline float
   get_floor_level()
   {return 0.0;}
 

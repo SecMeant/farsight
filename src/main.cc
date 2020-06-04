@@ -48,7 +48,7 @@ static int CHECKERBOARD[2]{ 8, 6 };
 static cv::Mat cameraMatrix, distCoeffs, R, T;
 static std::vector<cv::Vec3d> rvecs, tvecs;
 farsight::Point2i interpol[2];
-double floor_level = 0.0;
+double floor_level = 1000.0;
 
 static libfreenect2::Frame depth_frame_cpy =
   libfreenect2::Frame(depth_width, depth_height, sizeof(float));

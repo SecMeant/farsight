@@ -1,4 +1,5 @@
 #include "image_proc.hpp"
+#include "3d.h"
 #include <fmt/format.h>
 
 detector::detector()
@@ -80,26 +81,42 @@ detector::setConfig(int kinectID,
 void
 detector::calcBiggestComponent(objectType t)
 {
-  auto &c1 =config[0].objects[to_underlying(t)];
-  auto &c2 =config[1].objects[to_underlying(t)];
+  auto &c1 = config[0].objects[to_underlying(t)];
+  auto &c2 = config[1].objects[to_underlying(t)];
 
-  farsight::PointArray map_;
-  std::copy(
-    c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_));
-  std::copy(
-    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
+  farsight::PointArray map_front, map_top;
   std::vector<cv::Point2f> pointsCloudTop;
   std::vector<cv::Point2f> pointsCloudFront;
-  for(auto &p :map_)
+
+  std::copy(
+    c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_front));
+  std::copy(
+    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_front));
+  for(auto &p :map_front)
   {
-    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
+    if(std::isnan(p.x))
+        continue;
     pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
   }
-  fmt::print("{}, {}\n",pointsCloudTop.size(), pointsCloudFront.size());
-  auto rectTop = cv::minAreaRect(pointsCloudTop);
+
+  auto fileredPC1 = farsight::get_translated_points_cam1();
+  auto fileredPC2 = farsight::get_translated_points_cam2();
+  std::copy(
+    fileredPC2.begin(), fileredPC2.end(), std::back_inserter(map_top));
+  std::copy(
+    fileredPC2.begin(), fileredPC2.end(), std::back_inserter(map_top));
+  for(auto &p :map_top)
+  {
+    if(std::isnan(p.x))
+        continue;
+    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
+  }
+
   auto rectFront = cv::minAreaRect(pointsCloudFront);
-  auto obj_width = rectTop.size.width;
   auto obj_height = rectFront.size.height;
+
+  auto rectTop = cv::minAreaRect(pointsCloudTop);
+  auto obj_width = rectTop.size.width;
   auto obj_length = rectTop.size.height;
   fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
 }
