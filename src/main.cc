@@ -540,6 +540,7 @@ main(int argc, char **argv)
         tvec[2] = glrot2.z;
         storage << "glrot_cam2" << tvec;
         storage << "distance" << distance;
+        storage << "floor_level" <<floor_level;
         storage.release();
         arucoCalibrated = true;
       }
@@ -578,28 +579,24 @@ main(int argc, char **argv)
         gpos.y = vec[1];
         gpos.z = vec[2];
         farsight::set_tvec_cam1(gpos);
-        fmt::print("\nGtvec cam1 {} {} {} \n",gpos.x, gpos.y, gpos.z );
         storage["glvec_cam2"] >> vec;
         gpos.x = vec[0];
         gpos.y = vec[1];
         gpos.z = vec[2];
         farsight::set_tvec_cam2(gpos);
-        fmt::print("\nGtvec cam2 {} {} {} \n",gpos.x, gpos.y, gpos.z );
         storage["glrot_cam1"] >> vec;
         gpos.x = vec[0];
         gpos.y = vec[1];
         gpos.z = vec[2];
         farsight::set_rvec_cam1(gpos);
-        fmt::print("\nGrvec cam1 {} {} {} \n",gpos.x, gpos.y, gpos.z );
         storage["glrot_cam2"] >> vec;
         gpos.x = vec[0];
         gpos.y = vec[1];
         gpos.z = vec[2];
         farsight::set_rvec_cam2(gpos);
-        fmt::print("\nGrvec cam2 {} {} {} \n",gpos.x, gpos.y, gpos.z );
         
         storage["distance"] >> distance;
-        fmt::print("\nDis {} , tvec {} {} {} \n", distance, pos.x, pos.y, pos.z);
+        storage["floor_level"] >> floor_level;
         storage.release();
         arucoCalibrated = true;
       }
@@ -616,10 +613,11 @@ main(int argc, char **argv)
       case 'r':
       case 'o': 
       {
+        auto depth_cpy = image_depth.clone();
         dec.saveDepthFrame(selectedKinnect, t, &depth_frame_cpy);
         const auto &pos = dec.getCameraPos(selectedKinnect);
         auto detectedBox = dec.detect(
-          selectedKinnect, depth->data, total_size_depth, image_depth);
+          selectedKinnect, depth->data, total_size_depth, depth_cpy);
         const auto &np = dec.getNearestPoint(selectedKinnect == 0 ? 1 : 0);
         double dist = distance - np.z;
         auto realPoints = createPointMaping(reg,
@@ -631,8 +629,8 @@ main(int argc, char **argv)
                                             dist);
         
         dec.setConfig(
-          selectedKinnect, t, image_depth, detectedBox, realPoints);
-        dec.displayCurrectConfig();
+          selectedKinnect, t, depth_cpy, detectedBox, realPoints);
+        //dec.displayCurrectConfig();
         dec.calcBiggestComponent(t);
       }
       break;

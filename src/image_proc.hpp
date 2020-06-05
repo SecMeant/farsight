@@ -14,7 +14,7 @@ public:
 
   bbox
   detect(int kinectID,
-         const byte *frame_object,
+         byte *frame_object,
          size_t size,
          cv::Mat &image_depth);
   void

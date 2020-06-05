@@ -14,20 +14,14 @@ detector::detector()
     cv::Size(depth_width * 2 + 10, depth_height * 2 + 10), CV_8UC1);
 }
 
-bbox detector::detect(int kinectID,const byte *frame_object, size_t size, cv::Mat &image_depth)
+bbox detector::detect(int kinectID, byte *frame_object, size_t size, cv::Mat &image_depth)
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
-  bool clr = false;
 
-  std::array<byte, depth_width*depth_height> frame_depth_;
-  std::copy(frame_object,
-            frame_object + depth_width*depth_height,
-            frame_depth_.data());
-
-  diff(frame_depth_.data(), config[kinectID].img_base.ptr(), size);
+  diff(frame_object, config[kinectID].img_base.ptr(), size);
   auto image_depth_ =
-    cv::Mat(depth_height, depth_width, CV_8UC1, frame_depth_.data());
+    cv::Mat(depth_height, depth_width, CV_8UC1, frame_object);
   cv::Mat image_depth_th, image_depth_filtered;
   cv::threshold(image_depth_, image_depth_th, lowerb, higherb, cv::THRESH_BINARY_INV);
   cv::inRange(image_depth_, lowerb2, higherb2, image_depth_filtered);
@@ -35,7 +29,6 @@ bbox detector::detect(int kinectID,const byte *frame_object, size_t size, cv::Ma
   cv::Mat labels, stats, centroids;
   cv::connectedComponentsWithStats(image_depth_filtered, labels, stats, centroids);
   
-  clr = !clr;
   bbox best_bbox;
 
   for (int i = 0; i < stats.rows; ++i)
@@ -58,8 +51,9 @@ bbox detector::detect(int kinectID,const byte *frame_object, size_t size, cv::Ma
     }
   }
   
-  cv::Scalar color(clr ? 255 : 0, 0, 0);
+  cv::Scalar color(0, 0, 0);
   cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
+  fmt::print("Found bbox: {} {} {} {} \n", best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
   cv::rectangle(image_depth, rect, color, 3);
   return best_bbox;
 }
