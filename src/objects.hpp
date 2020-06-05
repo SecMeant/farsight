@@ -37,6 +37,7 @@ using objectArray = std::array<object_t, objectsPerCamera>;
 struct cameraConfig
 {
     farsight::Point3f camPose {0,0,0};
+    farsight::Point3f camRot {0,0,0};
     cv::Mat img_base = cv::Mat::zeros(
         cv::Size(depth_width, depth_height), CV_8UC1);;
     libfreenect2::Frame base =

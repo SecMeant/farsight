@@ -42,7 +42,6 @@ constexpr int waitTime = 50;
 
 const int floor_level_max = 1000;
 int floor_level_raw;
-
 // Defining the dimensions of checkerboard
 static int CHECKERBOARD[2]{ 8, 6 };
 static cv::Mat cameraMatrix, distCoeffs, R, T;
@@ -63,6 +62,8 @@ const char *arucoConfigPath = "../../../aruco/aruco.conf";
 std::atomic_flag continue_flag;
 std::vector<cv::String> images;
 std::vector<cv::Mat> arucoDict;
+std::vector<std::vector<cv::Point2f>> corners;
+
 using namespace cv;
 
 void
@@ -196,13 +197,8 @@ calibrateAruco()
                       distCoeffs,
                       R,
                       T);
-  cv::FileStorage storage(arucoConfigPath, cv::FileStorage::WRITE);
-  storage << "cameraMatrix" << cameraMatrix;
-  storage << "distCoeffs" << distCoeffs;
-  storage << "R" << R;
-  storage << "T" << T;
-  storage.release();
 }
+
 
 void
 findAruco(const cv::Mat &f)
@@ -212,7 +208,6 @@ findAruco(const cv::Mat &f)
     cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
   cv::Mat imageCopy;
   f.copyTo(imageCopy);
-  std::vector<std::vector<cv::Point2f>> corners;
   cv::aruco::detectMarkers(f, dictionary, corners, ids);
   // if at least one marker detected
   if (ids.size() > 0)
@@ -222,7 +217,7 @@ findAruco(const cv::Mat &f)
       corners, 0.40, cameraMatrix, distCoeffs, rvecs, tvecs);
   if (tvecs.size() && rvecs.size())
   {
-    //fmt::print("{} {} {}\n", tvecs[0][0],tvecs[0][1],tvecs[0][2] ); 
+    fmt::print("{} {} {}\n", tvecs[0][0],tvecs[0][1],tvecs[0][2] ); 
   }
     // draw axis for each marker
     for (int i = 0; i < ids.size(); i++)
@@ -232,9 +227,42 @@ findAruco(const cv::Mat &f)
   cv::imshow(wndaruco, imageCopy);
 }
 
+glm::vec3
+findCameraOffsetDiff(const libfreenect2::Registration &reg,
+                     const libfreenect2::Frame *f,
+                     glm::vec3 gtvec)
+{
+  const auto &first_face_corners = corners[0];
+  const auto &corner= first_face_corners[0];
+
+  int pos;
+  float rgb_x, rgb_y;
+  farsight::Point3f p;
+  auto *data = reinterpret_cast<float*>(f->data);
+  for (int r = 0; r < f->height; r++)
+  {
+    for (int c = 0; c < f->width; c++)
+    {
+      pos = r * f->width + c;
+      reg.apply(r,c, data[pos], rgb_x, rgb_y);
+      if(corner.x < rgb_x && corner.y < rgb_y)
+      {
+          reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
+          auto fix_x = gtvec.x - (gtvec.x - p.x) - 0.25;
+          auto fix_y = gtvec.y - (gtvec.y - p.y);
+          auto fix_z = gtvec.z;
+          fmt::print("FIX OFFSET {} {} {}\n", fix_x, fix_y, fix_z);
+          return {fix_x, fix_y, fix_z};
+      }
+    }
+  }
+ return {};
+}
+
 void
 generateScene(const libfreenect2::Registration &reg,
               const libfreenect2::Frame *f,
+              const farsight::Point3f& tvec,
               const int cam)
 {
   farsight::Point3f p{ 0, 0, 0 };
@@ -245,8 +273,7 @@ generateScene(const libfreenect2::Registration &reg,
 
   float nan = NAN;
 
-  auto &tvec = tvecs[0];
-  glm::vec3 gtvec = { tvec[0], tvec[1], tvec[2] };
+  glm::vec3 gtvec = { tvec.x, tvec.y, tvec.z };
 
   cv::Mat r_mat;
   cv::Rodrigues(rvecs[0], r_mat);
@@ -281,6 +308,7 @@ generateScene(const libfreenect2::Registration &reg,
     }
   }
   fmt::print("Updating opngl");
+  fmt::print("tvec {} {} {} \n", gtvec.x, gtvec.y,gtvec.z);
   farsight::camera2real(pointMap, gtvec, grmat, ids[0]);
   if (cam == 0)
     farsight::update_points_cam1(pointMap, depth_width);
@@ -293,7 +321,9 @@ generateScene(const libfreenect2::Registration &reg,
 farsight::PointArray
 createPointMaping(const libfreenect2::Registration &reg,
                   const libfreenect2::Frame *f,
+                  const byte* filtered,
                   const bbox &b,
+                  const farsight::Point3f& tvec,
                   int cam,
                   double distance)
 {
@@ -305,8 +335,7 @@ createPointMaping(const libfreenect2::Registration &reg,
 
   float nan = NAN;
 
-  auto &tvec = tvecs[0];
-  glm::vec3 gtvec = { tvec[0], tvec[1], tvec[2] };
+  glm::vec3 gtvec = { tvec.x, tvec.y, tvec.z };
 
   cv::Mat r_mat;
   cv::Rodrigues(rvecs[0], r_mat);
@@ -321,13 +350,14 @@ createPointMaping(const libfreenect2::Registration &reg,
       grmat[r][c] = d;
     }
   }
-  fmt::print("{} {} {} {}", b.x, b.y, b.w, b.h);
+  int pos;
   for (int r = b.y; r < b.y + b.h; r++)
   {
     for (int c = b.x; c < b.x + b.w; c++)
     {
+      pos = r * b.w + c;
       reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-      if (p.z > distance  || p.y >= floor_level)
+      if (p.z > distance  || p.y >= floor_level || filtered[pos] == 255)
       {
         pointMap.push_back({ nan, nan, nan });
         continue;
@@ -426,18 +456,23 @@ main(int argc, char **argv)
     cv::Mat gray;
     auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
     cv::cvtColor(image_rgb, gray, cv::COLOR_BGR2GRAY);
+
     if (arucoCalibrated == true)
     {
       findAruco(gray);
       if (c == 's')
       {
         const auto &tvec = tvecs[0];
+        const auto &rvec = rvecs[0];
         farsight::Point3f pos( tvec[0], tvec[1], tvec[2] );
+        farsight::Point3f rot( rvec[0], rvec[1], rvec[2] );
         dec.setCameraPos(selectedKinnect, pos);
+        dec.setCameraRot(selectedKinnect, rot);
         distance = dec.calcMaxDistance();
-        fmt::print("Curent distance is {}\n", distance);
+        generateScene(reg, depth, pos, selectedKinnect);
       }
     }
+
     depthProcess(depth);
     conv32FC1To8CU1(depth->data, depth->height * depth->width);
     auto image_depth =
@@ -448,22 +483,123 @@ main(int argc, char **argv)
       case 'b': {
         fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
         dec.saveBaseDepthImg(selectedKinnect, image_depth);
-        generateScene(reg, &depth_frame_cpy, selectedKinnect);
       }
       break;
       case 'c': {
         cv::glob("../../../aruco/*.jpg", images);
         fmt::print("calibration started");
-        calibrateAruco();
+        //calibrateAruco();
+        cv::Vec3d tvec;
+        cv::Vec3d rvec;
+        cv::FileStorage storage(arucoConfigPath, cv::FileStorage::WRITE);
+        storage << "cameraMatrix" << cameraMatrix;
+        storage << "distCoeffs" << distCoeffs;
+        storage << "R" << R;
+        storage << "T" << T;
+        const auto &pos1 =dec.getCameraPos(0);
+        tvec[0] = pos1.x;
+        tvec[1] = pos1.y;
+        tvec[2] = pos1.z;
+        storage << "tvec_cam1" << tvec;
+        const auto &pos2 =dec.getCameraPos(1);
+        tvec[0] = pos2.x;
+        tvec[1] = pos2.y;
+        tvec[2] = pos2.z;
+        storage << "tvec_cam2" << tvec;
+        
+        const auto &rot1 =dec.getCameraRot(0);
+        rvec[0] = rot1.x;
+        rvec[1] = rot1.y;
+        rvec[2] = rot1.z;
+        storage << "rvec_cam1" << rvec;
+        const auto &rot2 =dec.getCameraRot(1);
+        rvec[0] = rot2.x;
+        rvec[1] = rot2.y;
+        rvec[2] = rot2.z;
+        storage << "rvec_cam2" << rvec;
+        
+        auto glvec1 = farsight::get_tvec_cam1();
+        tvec[0] = glvec1.x;
+        tvec[1] = glvec1.y;
+        tvec[2] = glvec1.z;
+        storage << "glvec_cam1" << tvec;
+        auto glvec2 = farsight::get_tvec_cam2();
+        tvec[0] = glvec2.x;
+        tvec[1] = glvec2.y;
+        tvec[2] = glvec2.z;
+        storage << "glvec_cam2" << tvec;
+
+        auto glrot1 = farsight::get_rvec_cam1();
+        tvec[0] = glrot1.x;
+        tvec[1] = glrot1.y;
+        tvec[2] = glrot1.z;
+        storage << "glrot_cam1" << tvec;
+        auto glrot2 = farsight::get_rvec_cam2();
+        tvec[0] = glrot2.x;
+        tvec[1] = glrot2.y;
+        tvec[2] = glrot2.z;
+        storage << "glrot_cam2" << tvec;
+        storage << "distance" << distance;
+        storage.release();
         arucoCalibrated = true;
       }
       break;
       case 'l': {
+        cv::Vec3d vec;
+        farsight::Point3f pos;
+        glm::vec3 gpos;
         cv::FileStorage storage(arucoConfigPath, cv::FileStorage::READ);
         storage["cameraMatrix"] >> cameraMatrix;
         storage["distCoeffs"] >> distCoeffs;
         storage["R"] >> R;
         storage["T"] >> T;
+        storage["tvec_cam1"] >> vec;
+        pos.x = vec[0];
+        pos.y = vec[1];
+        pos.z = vec[2];
+        dec.setCameraPos(0, pos);
+        storage["tvec_cam2"] >> vec;
+        pos.x = vec[0];
+        pos.y = vec[1];
+        pos.z = vec[2];
+        dec.setCameraPos(1, pos);
+        storage["rvec_cam1"] >> vec;
+        pos.x = vec[0];
+        pos.y = vec[1];
+        pos.z = vec[2];
+        dec.setCameraRot(0, pos);
+        storage["rvec_cam2"] >> vec;
+        pos.x = vec[0];
+        pos.y = vec[1];
+        pos.z = vec[2];
+        dec.setCameraRot(1, pos);
+        storage["glvec_cam1"] >> vec;
+        gpos.x = vec[0];
+        gpos.y = vec[1];
+        gpos.z = vec[2];
+        farsight::set_tvec_cam1(gpos);
+        fmt::print("\nGtvec cam1 {} {} {} \n",gpos.x, gpos.y, gpos.z );
+        storage["glvec_cam2"] >> vec;
+        gpos.x = vec[0];
+        gpos.y = vec[1];
+        gpos.z = vec[2];
+        farsight::set_tvec_cam2(gpos);
+        fmt::print("\nGtvec cam2 {} {} {} \n",gpos.x, gpos.y, gpos.z );
+        storage["glrot_cam1"] >> vec;
+        gpos.x = vec[0];
+        gpos.y = vec[1];
+        gpos.z = vec[2];
+        farsight::set_rvec_cam1(gpos);
+        fmt::print("\nGrvec cam1 {} {} {} \n",gpos.x, gpos.y, gpos.z );
+        storage["glrot_cam2"] >> vec;
+        gpos.x = vec[0];
+        gpos.y = vec[1];
+        gpos.z = vec[2];
+        farsight::set_rvec_cam2(gpos);
+        fmt::print("\nGrvec cam2 {} {} {} \n",gpos.x, gpos.y, gpos.z );
+        
+        storage["distance"] >> distance;
+        fmt::print("\nDis {} , tvec {} {} {} \n", distance, pos.x, pos.y, pos.z);
         storage.release();
         arucoCalibrated = true;
       }
@@ -481,13 +617,16 @@ main(int argc, char **argv)
       case 'o': 
       {
         dec.saveDepthFrame(selectedKinnect, t, &depth_frame_cpy);
+        const auto &pos = dec.getCameraPos(selectedKinnect);
         auto detectedBox = dec.detect(
           selectedKinnect, depth->data, total_size_depth, image_depth);
         const auto &np = dec.getNearestPoint(selectedKinnect == 0 ? 1 : 0);
         double dist = distance - np.z;
         auto realPoints = createPointMaping(reg,
                                             &depth_frame_cpy,
+                                            depth->data,
                                             detectedBox,
+                                            pos,
                                             selectedKinnect,
                                             dist);
         

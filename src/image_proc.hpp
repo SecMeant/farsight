@@ -38,11 +38,33 @@ public:
     auto &c = config[kinectID].objects[to_underlying(t)];
     memcpy(c.depthFrame.data, frame->data, depth_width*depth_height*sizeof(float)); 
   }
+
   void
   setCameraPos(int kinectID, farsight::Point3f pos)
   {
     auto &c = config[kinectID];
     c.camPose = pos;
+  }
+
+  void
+  setCameraRot(int kinectID, farsight::Point3f rot)
+  {
+    auto &c = config[kinectID];
+    c.camRot = rot;
+  }
+
+  const farsight::Point3f&
+  getCameraPos(int kinectID)
+  {
+    auto &c = config[kinectID];
+    return c.camPose;
+  }
+
+  const farsight::Point3f&
+  getCameraRot(int kinectID)
+  {
+    auto &c = config[kinectID];
+    return c.camRot;
   }
 
   double calcMaxDistance()
