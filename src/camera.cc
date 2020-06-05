@@ -104,10 +104,10 @@ namespace farsight {
   {
     check_face_id(id);
 
-    // Get marker offset from camera
+    // Get found marker offset from camera
     glm::vec3 camera_pos = tvec;
 
-    // Apply relative face offset 
+    // Apply relative face offset from camera to front marker
     camera_pos += calculate_face_offset(id);
 
     // Get camera position relative to front marker (world 0,0,0)
@@ -121,9 +121,11 @@ namespace farsight {
       point.y += camera_pos.y;
       point.z += camera_pos.z;
 
-      point = calculate_face_rotation(id) * point;
+      // Apply found maker rotation
+      point = rot * point;
 
-     // point = rot * point;
+      // Apply marker relative rotation
+      point = calculate_face_rotation(id) * point;
     }
   }
 
