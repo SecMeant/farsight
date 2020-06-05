@@ -113,13 +113,14 @@ namespace farsight {
     // Get camera position relative to front marker (world 0,0,0)
     camera_pos *= -1.0f;
 
-    fmt::print("Camera pos: {} {} {}\n", camera_pos.x, camera_pos.y, camera_pos.z);
+    fmt::print("Camera pos: {} {} {} {}\n", camera_pos.x, camera_pos.y, camera_pos.z, id);
+
+    // Fix badly printed aruco?
+    rot = rot * rotmat(Axis::Z, -(M_TAU / 4.0f));
 
     // Apply camera offset and rotation to all points.
     for (auto &point : points) {
-      point.x += camera_pos.x;
-      point.y += camera_pos.y;
-      point.z += camera_pos.z;
+      point += camera_pos;
 
       // Apply found maker rotation
       point = rot * point;
