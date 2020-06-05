@@ -257,8 +257,8 @@ static void
 Keyboard(unsigned char key, int x, int y)
 {
   constexpr double camera_speed = 0.2f;
-  float tspeed = 0.05f;
-  float rotangle = (M_PI * 2.0f) / 32.0f;
+  static float tspeed = 0.05f;
+  static float rotangle = (M_PI * 2.0f) / 32.0f;
 
   switch (key)
   {
