@@ -137,11 +137,11 @@ drawpoints(const CameraShot &cs)
       p.y += cs.tvec.y;
       p.z += cs.tvec.z;
 
+      p.y *= (-1.0f);
+
       p = glm::rotateX(p, cs.rvec.x);
       p = glm::rotateY(p, cs.rvec.y);
       p = glm::rotateZ(p, cs.rvec.z);
-
-      p.y *= (-1.0f);
 
       if (p.y <= (FLOOR_BASE_Y + cs.floor_level))
         continue;
