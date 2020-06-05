@@ -35,6 +35,15 @@ namespace farsight {
     {
       return glm::vec3{x,y,z};
     }
+
+    Point3f& operator+=(const glm::vec3 &v)
+    {
+      this->x += v.x;
+      this->y += v.y;
+      this->z += v.z;
+
+      return *this;
+    }
   };
 
   struct Point2i
