@@ -1,9 +1,47 @@
+#include <cmath>
 #include <cassert>
 
 #include "camera.h"
 
 #include <fmt/format.h>
+
+constexpr static float M_TAU = M_PI * 2.0f;
+
 namespace farsight {
+
+  enum class Axis {
+    X, Y, Z
+  };
+
+  static glm::mat4x4 rotmat(Axis axis, float angle)
+  {
+    // clang-format off
+    switch(axis) {
+      case Axis::X:
+        return glm::mat3x3(
+           1.0f            ,  0.0f            , 0.0f           ,
+           0.0f            ,  std::cos(angle) , std::sin(angle),
+           0.0f            , -std::sin(angle) , std::cos(angle)
+        );
+
+      case Axis::Y:
+        return glm::mat3x3(
+           std::cos(angle) , 0.0f             , -std::sin(angle),
+           0.0f            , 1.0f             , 0.0f            ,
+           std::sin(angle) , 0.0f             , std::cos(angle)
+        );
+
+      case Axis::Z:
+        return glm::mat3x3(
+           std::cos(angle)  , std::sin(angle) , 0.0f            ,
+          -std::sin(angle)  , std::cos(angle) , 0.0f            ,
+           0.0f             , 0.0f            , 1.0f
+        );
+    }
+
+    assert(false && "Unexpected enum value");
+    // clang-format on
+  }
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -19,6 +57,16 @@ namespace farsight {
     [4] = glm::vec3( 0.00f, 0.25f,-0.25f ),
     [5] = glm::vec3( 0.00f, 0.00f,-0.50f ),
   };
+
+  const glm::mat3x3 faces_rotation[6] {
+    [0] = rotmat(Axis::Y, -(M_TAU / 4.0f)),
+    [1] = glm::mat4x4(1.0f),
+    [2] = rotmat(Axis::Y, M_TAU / 4.0f),
+    [3] = rotmat(Axis::X, M_TAU / 4.0f),
+    [4] = rotmat(Axis::X, -(M_TAU / 4.0f)),
+    [5] = rotmat(Axis::Y, M_TAU / 2.0f)
+  };
+
   // clang-format on
 
 #if defined(__clang__)
@@ -39,6 +87,13 @@ namespace farsight {
   {
     check_face_id(id);
     return faces_position[id] * -1.0f;
+  }
+
+  static glm::mat3x3
+  calculate_face_rotation(int id)
+  {
+    check_face_id(id);
+    return faces_rotation[id];
   }
 
   void
@@ -65,6 +120,8 @@ namespace farsight {
       point.x += camera_pos.x;
       point.y += camera_pos.y;
       point.z += camera_pos.z;
+
+      point = calculate_face_rotation(id) * point;
 
      // point = rot * point;
     }
