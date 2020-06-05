@@ -51,7 +51,7 @@ bbox detector::detect(int kinectID, byte *frame_object, size_t size, cv::Mat &im
     }
   }
   
-  cv::Scalar color(0, 0, 0);
+  cv::Scalar color(255);
   cv::Rect rect(best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
   fmt::print("Found bbox: {} {} {} {} \n", best_bbox.x,best_bbox.y,best_bbox.w,best_bbox.h);
   cv::rectangle(image_depth, rect, color, 3);

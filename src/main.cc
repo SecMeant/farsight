@@ -58,6 +58,8 @@ const char *wndname3 = "wnd3";
 const char *wndname4 = "wnd4";
 const char *wndaruco = "aruco";
 const char *arucoConfigPath = "../../../aruco/aruco.conf";
+static const std::vector<char> base_scenario = {'1', 'b','2', 'b', '1', 'e'};
+static const std::vector<char> meassure_scenario = {'1','n','2', 'n', '1', 'r', '2', 'r','1', 'e'};
 
 std::atomic_flag continue_flag;
 std::vector<cv::String> images;
@@ -307,7 +309,7 @@ generateScene(const libfreenect2::Registration &reg,
       }
     }
   }
-  fmt::print("Updating opngl");
+  fmt::print("Updating opengl\n");
   fmt::print("tvec {} {} {} \n", gtvec.x, gtvec.y,gtvec.z);
   farsight::camera2real(pointMap, gtvec, grmat, ids[0]);
   if (cam == 0)
@@ -357,7 +359,7 @@ createPointMaping(const libfreenect2::Registration &reg,
     {
       pos = r * b.w + c;
       reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-      if (p.z > distance  || p.y >= floor_level || filtered[pos] == 255)
+      if (p.z > distance || filtered[pos] == 255)
       {
         pointMap.push_back({ nan, nan, nan });
         continue;
@@ -401,9 +403,10 @@ main(int argc, char **argv)
   int selectedKinnect = 0;
   constexpr int filterTimes = 100;
   int filterCounter = 0;
+  auto scenario_iter = base_scenario.end()-1;
+
   std::thread gl_thread(farsight::init3d);
   gl_thread.detach();
-
   detector dec;
   kinect k_dev(selectedKinnect);
   libfreenect2::Frame undistorted(
@@ -415,6 +418,7 @@ main(int argc, char **argv)
   shared_t shared{ std::mutex(), reg };
   cv::namedWindow(wndname2, cv::WINDOW_AUTOSIZE);
   cv::setMouseCallback(wndname2, mouse_event_handler, &shared);
+
   namedWindow("floor", WINDOW_AUTOSIZE); // Create Window
   createTrackbar("Floor level", "floor", &floor_level_raw, floor_level_max, on_trackbar);
   objectType t;
@@ -432,12 +436,8 @@ main(int argc, char **argv)
     {
       t = objectType::REFERENCE_OBJ;
     }
-    else if (c == 'o')
-    {
-      t = objectType::MEASURED_OBJ;
-    }
 
-    if (c == 'b' || c == 'r' || c == '0' || c == 'n')
+    if (c == 'b' || c == 'r' || c == 'n')
     {
       stage1.apply(*depth);
       if(filterCounter < filterTimes)
@@ -476,15 +476,9 @@ main(int argc, char **argv)
     depthProcess(depth);
     conv32FC1To8CU1(depth->data, depth->height * depth->width);
     auto image_depth =
-      cv::Mat(depth->height,depth->width, CV_8UC1, depth->data);
-
-    switch (c)
+      cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
+    switch(c)
     {
-      case 'b': {
-        fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
-        dec.saveBaseDepthImg(selectedKinnect, image_depth);
-      }
-      break;
       case 'c': {
         cv::glob("../../../aruco/*.jpg", images);
         fmt::print("calibration started");
@@ -601,6 +595,29 @@ main(int argc, char **argv)
         arucoCalibrated = true;
       }
       break;
+      case 'x':
+      {
+          farsight::set_floor_level(floor_level);
+      }
+      break;
+      case '1':
+        if (k_dev.open(0))
+          selectedKinnect = 0;
+        break;
+      case '2':
+        if (k_dev.open(1))
+          selectedKinnect = 1;
+        break;
+    
+    }
+    
+    switch (*scenario_iter)
+    {
+      case 'b': {
+        fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
+        dec.saveBaseDepthImg(selectedKinnect, image_depth);
+      }
+      break;
       case 'n': {
         auto detectedBox = dec.detect(
           selectedKinnect, depth->data, total_size_depth, image_depth);
@@ -611,7 +628,6 @@ main(int argc, char **argv)
       }
       break;
       case 'r':
-      case 'o': 
       {
         auto depth_cpy = image_depth.clone();
         dec.saveDepthFrame(selectedKinnect, t, &depth_frame_cpy);
@@ -630,13 +646,8 @@ main(int argc, char **argv)
         
         dec.setConfig(
           selectedKinnect, t, depth_cpy, detectedBox, realPoints);
-        //dec.displayCurrectConfig();
-        dec.calcBiggestComponent(t);
-      }
-      break;
-      case 'x':
-      {
-          farsight::set_floor_level(floor_level);
+        dec.displayCurrectConfig();
+        //dec.calcBiggestComponent(t);
       }
       break;
       case '1':
@@ -651,11 +662,31 @@ main(int argc, char **argv)
 
     cv::imshow(wndname2, image_depth);
     c = cv::waitKey(waitTime);
-    if (c == 'b' || c == 'n' || c == 'o' || c == 'r')
+
+    if (*scenario_iter == 'b' || *scenario_iter == 'n' || *scenario_iter == 'r')
     {
-      std::this_thread::sleep_for(std::chrono::seconds(4));
       stage1.reset();
       depth->data = depth_backup;
+    }
+    if(*scenario_iter != 'e')
+    {
+        fmt::print("Current action {} \n", *scenario_iter);
+        scenario_iter++;
+    }
+
+    if( c == 'b')
+    {
+      if(*scenario_iter == 'e'){
+          scenario_iter = base_scenario.begin(); 
+          std::this_thread::sleep_for(std::chrono::seconds(4));
+      }
+    }
+    else if(c == 'm')
+    {
+      if(*scenario_iter == 'e'){
+          scenario_iter = meassure_scenario.begin(); 
+          std::this_thread::sleep_for(std::chrono::seconds(4));
+      }
     }
     k_dev.releaseFrames();
   }
