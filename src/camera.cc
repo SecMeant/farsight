@@ -13,7 +13,7 @@ namespace farsight {
     X, Y, Z
   };
 
-  static glm::mat4x4 rotmat(Axis axis, float angle)
+  static glm::mat3x3 rotmat(Axis axis, float angle)
   {
     // clang-format off
     switch(axis) {
