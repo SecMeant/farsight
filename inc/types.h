@@ -67,7 +67,7 @@ namespace farsight {
     std::vector<Point3f> points {{0,0,0}};
     glm::vec3 tvec {0.0f, 0.0f, 0.0f};
     glm::vec3 rvec {0.0f, 0.0f, 0.0f};
-    float floor_level = FLOOR_BASE_Y;
+    float floor_level = 0.0f;
   };
 
   struct Context3D
