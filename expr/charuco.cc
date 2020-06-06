@@ -16,14 +16,87 @@
 #include <iostream>
 #include <stdio.h>
 
+#include <string>
+
 const cv::Ptr<cv::aruco::Dictionary> dict =
   cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 const cv::Ptr<cv::aruco::CharucoBoard> chboard =
   cv::aruco::CharucoBoard::create(5, 7, 0.035f, 0.021f, dict);
 const cv::Size img_size(1080, 1920);
 
+void
+depthProcess(libfreenect2::Frame *frame)
+{
+  auto total_size = frame->height * frame->width;
+  auto fp = reinterpret_cast<float *>(frame->data);
+
+  for (int i = 0; i < total_size; i++)
+  {
+    fp[i] /= 65535.0f;
+  }
+}
+
+void
+conv32FC1To8CU1(unsigned char *data, size_t size)
+{
+  auto fp = reinterpret_cast<float *>(data);
+
+  for (auto i = 0; i < size; ++i, ++fp, ++data)
+    *data = static_cast<unsigned char>(*fp * 255.0f);
+}
+
+enum class FrameGrabberType
+{
+  RGB,
+  IR,
+  UNKNOWN
+};
+
+struct FrameGrabber
+{
+  FrameGrabber(FrameGrabberType type)
+    : type(type)
+  {}
+
+  cv::Mat
+  grab(kinect &kdev)
+  {
+    cv::Mat image;
+
+    switch (this->type)
+    {
+      case FrameGrabberType::RGB: {
+        libfreenect2::Frame *rgb = kdev.frames[libfreenect2::Frame::Color];
+        image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
+        cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
+        break;
+      }
+
+      case FrameGrabberType::IR: {
+        libfreenect2::Frame *ir = kdev.frames[libfreenect2::Frame::Ir];
+
+        depthProcess(ir);
+        conv32FC1To8CU1(ir->data, ir->height * ir->width);
+
+        image = cv::Mat(ir->height, ir->width, CV_8UC1, ir->data);
+        cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
+
+        break;
+      }
+      case FrameGrabberType::UNKNOWN: {
+        assert(false);
+      }
+    }
+
+    cv::flip(image, image, 1);
+    return image;
+  }
+
+  const FrameGrabberType type;
+};
+
 static auto
-charuco_find_precalib(kinect &kdev)
+charuco_find_precalib(kinect &kdev, FrameGrabber fg)
 {
   cv::Ptr<cv::aruco::DetectorParameters> params =
     cv::aruco::DetectorParameters::create();
@@ -35,13 +108,9 @@ charuco_find_precalib(kinect &kdev)
   while (1)
   {
     kdev.waitForFrames(10);
-    libfreenect2::Frame *rgb= kdev.frames[libfreenect2::Frame::Color];
 
-    cv::Mat image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data),
-            image_copy;
+    cv::Mat image = fg.grab(kdev), image_copy;
 
-    cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
-    cv::flip(image, image, 1);
     image.copyTo(image_copy);
     std::vector<int> marker_ids;
     std::vector<std::vector<cv::Point2f>> marker_corners;
@@ -98,7 +167,8 @@ save_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
 {
   cv::FileStorage fs(settings_filename, cv::FileStorage::WRITE);
 
-  if (!fs.isOpened()) {
+  if (!fs.isOpened())
+  {
     fmt::print("Warning failed to save settings.\n");
     return;
   }
@@ -112,7 +182,8 @@ load_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
 {
   cv::FileStorage fs(settings_filename, cv::FileStorage::READ);
 
-  if (!fs.isOpened()) {
+  if (!fs.isOpened())
+  {
     fmt::print("Warning failed to load settings.\n");
     return;
   }
@@ -122,10 +193,41 @@ load_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
 }
 
 int
-main()
+main(int argc, char **argv)
 {
+  FrameGrabberType image_type;
+  if (argc == 1)
+  {
+    image_type = FrameGrabberType::RGB;
+  }
+  else if (argc == 2)
+  {
+    std::string type_str = argv[1];
+    std::for_each(std::begin(type_str), std::end(type_str), [](char &c) {
+      c = std::toupper(c);
+    });
+
+    if (type_str == "RGB")
+    {
+      image_type = FrameGrabberType::RGB;
+    }
+    else if (type_str == "IR")
+    {
+      image_type = FrameGrabberType::IR;
+    }
+    else
+    {
+      puts("Unknown image type. Try RGB or IR\n");
+      return 1;
+    }
+  }
+
+  FrameGrabber grabber(image_type);
+
   kinect kdev(0);
-  auto [charuco_corners, charuco_ids] = charuco_find_precalib(kdev);
+
+  auto [charuco_corners, charuco_ids] =
+    charuco_find_precalib(kdev, grabber);
 
   cv::Mat camera_matrix, dist_coeffs;
   std::vector<cv::Mat> rvecs, tvecs;
