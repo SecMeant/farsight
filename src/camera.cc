@@ -50,12 +50,12 @@ namespace farsight {
 
   // clang-format off
   const glm::vec3 faces_position[6] {
-    [0] = glm::vec3(-0.25f, 0.00f,-0.25f ),
-    [1] = glm::vec3( 0.00f, 0.00f,-0.00f ),
-    [2] = glm::vec3( 0.25f, 0.00f,-0.25f ),
-    [3] = glm::vec3( 0.00f,-0.25f,-0.25f ),
-    [4] = glm::vec3( 0.00f, 0.25f,-0.25f ),
-    [5] = glm::vec3( 0.00f, 0.00f,-0.50f ),
+    [0] = glm::vec3( 0.25f, 0.00f, 0.25f ),
+    [1] = glm::vec3(-0.00f, 0.00f, 0.00f ),
+    [2] = glm::vec3(-0.25f, 0.00f, 0.25f ),
+    [3] = glm::vec3(-0.00f,-0.25f, 0.25f ),
+    [4] = glm::vec3(-0.00f, 0.25f, 0.25f ),
+    [5] = glm::vec3(-0.00f, 0.00f, 0.50f ),
   };
 
   const glm::mat3x3 faces_rotation[6] {

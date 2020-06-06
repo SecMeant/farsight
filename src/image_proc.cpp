@@ -73,11 +73,13 @@ detector::setConfig(int kinectID,
 }
 
 void
-detector::calcBiggestComponent(objectType t)
+detector::calcBiggestComponent()
 {
-  auto &c1 = config[0].objects[to_underlying(t)];
-  auto &c2 = config[1].objects[to_underlying(t)];
-
+  auto &c1 = config[0].objects[to_underlying(objectType::REFERENCE_OBJ)];
+  auto &c2 = config[1].objects[to_underlying(objectType::REFERENCE_OBJ)];
+  
+  if(!c1.configured || !c2.configured)
+    return;
   farsight::PointArray map_front, map_top;
   std::vector<cv::Point2f> pointsCloudTop;
   std::vector<cv::Point2f> pointsCloudFront;

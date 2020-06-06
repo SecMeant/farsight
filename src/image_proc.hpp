@@ -24,7 +24,7 @@ public:
             const bbox &a,
             const farsight::PointArray &flattened);
   void
-  calcBiggestComponent(objectType t);
+  calcBiggestComponent();
   void
   displayCurrectConfig();
   void

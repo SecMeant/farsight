@@ -14,6 +14,27 @@
 #include "kinect_manager.hpp"
 int CHECKERBOARD[2]{8,6}; 
 
+void
+depthProcess(libfreenect2::Frame *frame)
+{
+  auto total_size = frame->height * frame->width;
+  auto fp = reinterpret_cast<float *>(frame->data);
+
+  for (int i = 0; i < total_size; i++)
+  {
+    fp[i] /= 65535.0f;
+  }
+}
+void
+conv32FC1To8CU1(unsigned char *data, size_t size)
+{
+  auto fp = reinterpret_cast<float *>(data);
+
+  for (auto i = 0; i < size; ++i, ++fp, ++data)
+    *data = static_cast<unsigned char>(*fp * 255.0f);
+}
+
+
 constexpr int waitTime=50;
 int frame_nr =0;
 // Defining the dimensions of checkerboard
@@ -31,10 +52,15 @@ int main()
     libfreenect2::Frame *rgb = k_dev.frames[libfreenect2::Frame::Color];
     libfreenect2::Frame *ir = k_dev.frames[libfreenect2::Frame::Ir];
     libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
-    auto image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-    cv::cvtColor( image,image,cv::COLOR_BGR2GRAY);
+    
+    depthProcess(ir);
+    conv32FC1To8CU1(ir->data, ir->height*ir->width);
+    auto image =
+      cv::Mat(ir->height, ir->width, CV_8UC1, ir->data);
+
     if ( c == 'c')
         saveNext = true;
+    fmt::print("asdkjasjlkdjsalkjdsa");
     if(saveNext)
     {
           cv::Mat f = image.clone();
@@ -50,7 +76,7 @@ int main()
             
             // Displaying the detected corner points on the checker board
             cv::drawChessboardCorners(f, cv::Size(CHECKERBOARD[0], CHECKERBOARD[1]), corner_pts, success);
-            cv::imwrite(fmt::format("../../../aruco/frame{}.jpg", frame_nr++),image);
+            cv::imwrite(fmt::format("../../../aruco_ir/frame{}.jpg", frame_nr++),image);
            saveNext = false; 
            image = f;
         }

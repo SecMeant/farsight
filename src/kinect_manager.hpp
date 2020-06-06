@@ -31,8 +31,19 @@ struct kinect
     return dev->getColorCameraParams();
   }
 
-  bool isActive = false;
+  void
+  setIRParams(libfreenect2::Freenect2Device::IrCameraParams &params)
+  {
+    dev->setIrCameraParams(params);
+  }
 
+  void 
+  setColorParams(libfreenect2::Freenect2Device::ColorCameraParams& params)
+  {
+    dev->setColorCameraParams(params);
+  }
+
+  bool isActive = false;
   libfreenect2::SyncMultiFrameListener listener;
   libfreenect2::FrameMap frames;
   libfreenect2::Freenect2Device *dev;
