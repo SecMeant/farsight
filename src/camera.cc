@@ -38,9 +38,10 @@ namespace farsight {
            0.0f             , 0.0f            , 1.0f
         );
     }
+    // clang-format on
 
     assert(false && "Unexpected enum value");
-    // clang-format on
+    return glm::mat3x3(1.0f);
   }
 
 #if defined(__clang__)
