@@ -546,7 +546,8 @@ main(int argc, char **argv)
   byte *depth_backup = nullptr;
   while (continue_flag.test_and_set() and c != 'q')
   {
-    k_dev.waitForFrames(10);
+    if (!k_dev.waitForFrames(10))
+      break;
 
     rgb = k_dev.frames[libfreenect2::Frame::Color];
     ir = k_dev.frames[libfreenect2::Frame::Ir];
