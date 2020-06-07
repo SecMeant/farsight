@@ -108,7 +108,6 @@ struct FrameGrabber
         if (next_file != last_file)
         {
           image = cv::imread(*next_file);
-          cv::flip(image, image, 1);
           ++next_file;
         }
         else
@@ -296,6 +295,16 @@ auto_calib(std::vector<std::string> &&filenames, std::string_view outfile)
 
 namespace popt = boost::program_options;
 
+static void
+usage(const char *program_name)
+{
+  fmt::print("Charuco calibration util. Generate clibration params from "
+             "images or video.\n"
+             "If no file names passed, live video is choosen\n\n"
+             "Usage: {} [file1[,file2[,file3...]]]\n",
+             program_name);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -305,11 +314,8 @@ main(int argc, char **argv)
   desc.add_options()
     ("help", "Shows this message")
 
-    ("type",popt::value<std::string>()->default_value("manual"),
-    "Calibration type: \"manual\" or \"auto\".")
-
     ("format", popt::value<std::string>()->default_value("RGB"),
-    "Image format: \"RGB\" or \"IR\". (used only if type == \"manual\")")
+    "Image format: \"RGB\" or \"IR\". (used only live video used)")
 
     ("outfile", popt::value<std::string>()->default_value(settings_filename),
     "Output filename.");
@@ -325,33 +331,19 @@ main(int argc, char **argv)
 
   if (vm.count("help"))
   {
+    usage(argv[0]);
     fmt::print("{}\n", desc);
     return 0;
   }
 
-  auto calib_type = vm["type"].as<std::string>();
   auto format = vm["format"].as<std::string>();
   auto outfile = vm["outfile"].as<std::string>();
 
-  if (calib_type == "manual")
-  {
+  std::vector<std::string> filenames =
+    popt::collect_unrecognized(parsed.options, popt::include_positional);
+
+  if (filenames.size() == 0)
     return manual_calib(format, outfile);
-  }
-  else if (calib_type == "auto")
-  {
-    std::vector<std::string> filenames =
-      popt::collect_unrecognized(parsed.options, popt::include_positional);
-
-    if (filenames.size() == 0)
-    {
-      fmt::print(
-        stderr,
-        "--type=auto expects list of files to process as arguments\n");
-      return 1;
-    }
-
+  else
     return auto_calib(std::move(filenames), outfile);
-  }
-
-  fmt::print("{}\n", desc);
 }
