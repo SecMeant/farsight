@@ -12,11 +12,14 @@
 
 #include "kinect_manager.hpp"
 
-#include <fmt/format.h>
-#include <iostream>
 #include <stdio.h>
 
+#include <optional>
 #include <string>
+
+#include <boost/program_options.hpp>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 const cv::Ptr<cv::aruco::Dictionary> dict =
   cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -49,18 +52,28 @@ enum class FrameGrabberType
 {
   RGB,
   IR,
-  UNKNOWN
+  FILE,
+  UNKNOWN,
 };
 
 struct FrameGrabber
 {
-  FrameGrabber(FrameGrabberType type)
+  FrameGrabber(FrameGrabberType type,
+               kinect &kdev,
+               std::vector<std::string> &&filenames = {})
     : type(type)
+    , kdev(kdev)
+    , filenames(std::move(filenames))
+    , next_file(std::begin(filenames))
+    , last_file(std::cend(filenames))
   {}
 
-  cv::Mat
+  std::optional<cv::Mat>
   grab(kinect &kdev)
   {
+    if (!kdev.waitForFrames(10))
+      return std::nullopt;
+
     cv::Mat image;
 
     switch (this->type)
@@ -69,6 +82,8 @@ struct FrameGrabber
         libfreenect2::Frame *rgb = kdev.frames[libfreenect2::Frame::Color];
         image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
         cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
+
+        cv::flip(image, image, 1);
         break;
       }
 
@@ -81,18 +96,36 @@ struct FrameGrabber
         image = cv::Mat(ir->height, ir->width, CV_8UC1, ir->data);
         cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
 
+        cv::flip(image, image, 1);
+        return image;
         break;
       }
+
+      case FrameGrabberType::FILE: {
+        if (next_file != last_file)
+        {
+          image = cv::imread(*next_file);
+          ++next_file;
+        }
+        else
+        {
+          return std::nullopt;
+        }
+      }
+
       case FrameGrabberType::UNKNOWN: {
         assert(false);
       }
     }
 
-    cv::flip(image, image, 1);
     return image;
   }
 
-  const FrameGrabberType type;
+  const FrameGrabberType type = FrameGrabberType::UNKNOWN;
+  const std::vector<std::string> filenames;
+  std::vector<std::string>::iterator next_file;
+  const std::vector<std::string>::const_iterator last_file;
+  kinect &kdev;
 };
 
 static auto
@@ -107,9 +140,12 @@ charuco_find_precalib(kinect &kdev, FrameGrabber fg)
 
   while (1)
   {
-    kdev.waitForFrames(10);
+    std::optional opt_image = fg.grab(kdev);
 
-    cv::Mat image = fg.grab(kdev), image_copy;
+    if (!opt_image)
+      break;
+
+    cv::Mat image = opt_image.value(), image_copy;
 
     image.copyTo(image_copy);
     std::vector<int> marker_ids;
@@ -163,9 +199,11 @@ charuco_find_precalib(kinect &kdev, FrameGrabber fg)
 constexpr auto settings_filename = "charuco_settings.yaml";
 
 static void
-save_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
+save_settings(cv::Mat &camera_matrix,
+              cv::Mat &dist_coeffs,
+              std::string_view filename)
 {
-  cv::FileStorage fs(settings_filename, cv::FileStorage::WRITE);
+  cv::FileStorage fs(filename.data(), cv::FileStorage::WRITE);
 
   if (!fs.isOpened())
   {
@@ -192,39 +230,31 @@ load_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
   fs["dist_coeffs"] >> dist_coeffs;
 }
 
-int
-main(int argc, char **argv)
+static int
+manual_calib(std::string color_type_str, std::string_view outfile)
 {
   FrameGrabberType image_type;
-  if (argc == 1)
+
+  std::for_each(std::begin(color_type_str),
+                std::end(color_type_str),
+                [](char &c) { c = std::toupper(c); });
+
+  if (color_type_str == "" || color_type_str == "RGB")
   {
     image_type = FrameGrabberType::RGB;
   }
-  else if (argc == 2)
+  else if (color_type_str == "IR")
   {
-    std::string type_str = argv[1];
-    std::for_each(std::begin(type_str), std::end(type_str), [](char &c) {
-      c = std::toupper(c);
-    });
-
-    if (type_str == "RGB")
-    {
-      image_type = FrameGrabberType::RGB;
-    }
-    else if (type_str == "IR")
-    {
-      image_type = FrameGrabberType::IR;
-    }
-    else
-    {
-      puts("Unknown image type. Try RGB or IR\n");
-      return 1;
-    }
+    image_type = FrameGrabberType::IR;
+  }
+  else
+  {
+    puts("Unknown image type. Try RGB or IR\n");
+    return 1;
   }
 
-  FrameGrabber grabber(image_type);
-
   kinect kdev(0);
+  FrameGrabber grabber(image_type, kdev);
 
   auto [charuco_corners, charuco_ids] =
     charuco_find_precalib(kdev, grabber);
@@ -242,5 +272,89 @@ main(int argc, char **argv)
                                     tvecs,
                                     0);
 
-  save_settings(camera_matrix, dist_coeffs);
+  save_settings(camera_matrix, dist_coeffs, outfile);
+
+  return 0;
+}
+
+static int
+auto_calib(std::vector<std::string> &&filenames, std::string_view outfile)
+{
+  kinect kdev = kinect::nodev();
+  FrameGrabber grabber(FrameGrabberType::FILE, kdev, std::move(filenames));
+
+  auto [charuco_corners, charuco_ids] =
+    charuco_find_precalib(kdev, grabber);
+
+  cv::Mat camera_matrix, dist_coeffs;
+  std::vector<cv::Mat> rvecs, tvecs;
+
+  cv::aruco::calibrateCameraCharuco(charuco_corners,
+                                    charuco_ids,
+                                    chboard,
+                                    img_size,
+                                    camera_matrix,
+                                    dist_coeffs,
+                                    rvecs,
+                                    tvecs,
+                                    0);
+
+  save_settings(camera_matrix, dist_coeffs, outfile);
+
+  return 0;
+}
+
+namespace popt = boost::program_options;
+
+int
+main(int argc, char **argv)
+{
+  popt::options_description desc;
+
+  // clang-format off
+  desc.add_options()
+    ("help", "Shows this message")
+
+    ("type",popt::value<std::string>()->default_value("manual"),
+    "Calibration type: \"manual\" or \"auto\".")
+
+    ("format", popt::value<std::string>()->default_value("RGB"),
+    "Image format: \"RGB\" or \"IR\". (used only if type == \"manual\")")
+
+    ("outfile", popt::value<std::string>()->default_value(settings_filename),
+    "Output filename.");
+  // clang-format on
+
+  popt::variables_map vm;
+  popt::parsed_options parsed = popt::command_line_parser(argc, argv)
+                                  .options(desc)
+                                  .allow_unregistered()
+                                  .run();
+  popt::store(parsed, vm);
+  popt::notify(vm);
+
+  if (vm.count("help"))
+  {
+    fmt::print("{}\n", desc);
+    return 0;
+  }
+
+  auto calib_type = vm["type"].as<std::string>();
+  auto format = vm["format"].as<std::string>();
+  auto outfile = vm["outfile"].as<std::string>();
+
+  fmt::print("Got {} {} {}\n", calib_type, format, outfile);
+
+  if (calib_type == "manual")
+  {
+    return manual_calib(format, outfile);
+  }
+  else if (calib_type == "auto")
+  {
+    std::vector<std::string> filenames =
+      popt::collect_unrecognized(parsed.options, popt::include_positional);
+    return auto_calib(std::move(filenames), outfile);
+  }
+
+  fmt::print("{}\n", desc);
 }
