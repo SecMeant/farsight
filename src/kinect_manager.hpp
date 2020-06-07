@@ -12,7 +12,7 @@ struct kinect
   ~kinect();
   bool
   open(int d_idx);
-  void
+  bool
   waitForFrames(int sec);
   void
   releaseFrames();
@@ -42,6 +42,9 @@ struct kinect
   {
     dev->setColorCameraParams(params);
   }
+
+  inline static kinect
+  nodev() { return {}; }
 
   bool isActive = false;
   libfreenect2::SyncMultiFrameListener listener;

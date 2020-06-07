@@ -57,14 +57,10 @@ kinect::open(int d_idx)
   return true;
 }
 
-void
+bool
 kinect::waitForFrames(int sec)
 {
-  if (!listener.waitForNewFrame(frames, sec * 1000))
-  {
-    fmt::print("TIMEDOUT !\n");
-    exit(-1);
-  }
+  return listener.waitForNewFrame(frames, sec * 1000);
 }
 
 void

@@ -32,6 +32,12 @@ if (BUILD_EXPERIMENTS)
 	target_link_libraries(aruco_dump ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
 	target_link_libraries(charuco ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} glfw OpenGL::GL fmt::fmt)
 	add_custom_command(TARGET aruco POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/media ${CMAKE_BINARY_DIR}/media)
+
+	find_package(Boost REQUIRED COMPONENTS program_options)
+	add_executable(charuco expr/charuco.cc src/kinect_manager.cpp)
+        target_include_directories(charuco PUBLIC src)
+	target_link_libraries(charuco ${OpenCV_LIBS} ${LibUSB_LIBRARIES} ${TurboJPEG_LIBRARIES} ${freenect2_LIBRARIES} fmt::fmt ${Boost_LIBRARIES})
+	set_property(TARGET charuco PROPERTY CXX_STANDARD 17)
 endif()
 
 add_executable(test ${CXX_SRC})

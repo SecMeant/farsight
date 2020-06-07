@@ -1,157 +1,360 @@
+#include <opencv2/aruco.hpp>
 #include <opencv2/aruco/charuco.hpp>
-#include <opencv2/highgui.hpp>
-#include <iostream>
-#include <string>
-#include <fmt/format.h>
-#include "kinect_manager.hpp"
+#include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/features2d.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/photo.hpp>
-#include <opencv2/opencv.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/photo.hpp>
 
-namespace {
-const char* about = "A tutorial code on charuco board creation and detection of charuco board with and without camera caliberation";
-const char* keys = "{c        |       | Put value of c=1 to create charuco board;\nc=2 to detect charuco board without camera calibration;\nc=3 to detect charuco board with camera calibration and Pose Estimation}";
-}
-void createBoard();
-void detectCharucoBoardWithCalibrationPose();
-void detectCharucoBoardWithoutCalibration();
-static bool readCameraParameters(std::string filename, cv::Mat& camMatrix, cv::Mat& distCoeffs)
+#include "kinect_manager.hpp"
+
+#include <stdio.h>
+
+#include <optional>
+#include <string>
+
+#include <boost/program_options.hpp>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
+const cv::Ptr<cv::aruco::Dictionary> dict =
+  cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+const cv::Ptr<cv::aruco::CharucoBoard> chboard =
+  cv::aruco::CharucoBoard::create(5, 7, 0.035f, 0.021f, dict);
+const cv::Size img_size(1080, 1920);
+
+void
+depthProcess(libfreenect2::Frame *frame)
 {
-    cv::FileStorage fs(filename, cv::FileStorage::READ);
-    if (!fs.isOpened())
-        return false;
-    fs["camera_matrix"] >> camMatrix;
-    fs["distortion_coefficients"] >> distCoeffs;
-    return true;
-}
-void createBoard()
-{
-    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
-    cv::Mat boardImage;
-    board->draw(cv::Size(600, 500), boardImage, 10, 1);
-    cv::imwrite("BoardImage.jpg", boardImage);
+  auto total_size = frame->height * frame->width;
+  auto fp = reinterpret_cast<float *>(frame->data);
+
+  for (int i = 0; i < total_size; i++)
+  {
+    fp[i] /= 65535.0f;
+  }
 }
 
-static kinect k_dev(0);
-void detectCharucoBoardWithCalibrationPose()
+void
+conv32FC1To8CU1(unsigned char *data, size_t size)
 {
-    cv::Mat cameraMatrix(3,3, CV_32FC1), distCoeffs(1, 6, CV_32FC1);
-    std::string filename = "calib.txt";
-    auto colorParams = k_dev.getColorParams();
-    cameraMatrix.at<float>(0,0) = colorParams.fx;
-    cameraMatrix.at<float>(1,1) = colorParams.fy;
-    cameraMatrix.at<float>(0,2) = colorParams.cx;
-    cameraMatrix.at<float>(0,0) = colorParams.cy;
-    bool readOk = readCameraParameters(filename, cameraMatrix, distCoeffs);
-        cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-        cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
-        cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
-        while (true) {
-            k_dev.waitForFrames(10);
-            libfreenect2::Frame *rgb = k_dev.frames[libfreenect2::Frame::Color];
-            libfreenect2::Frame *ir = k_dev.frames[libfreenect2::Frame::Ir];
-            libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
-            cv::Mat imageCopy;
-            auto image =
-              cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-            cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
-            image.copyTo(imageCopy);
-            std::vector<int> markerIds;
-            std::vector<std::vector<cv::Point2f> > markerCorners;
-            cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
-            // if at least one marker detected
-            if (markerIds.size() > 0) {
-                cv::aruco::drawDetectedMarkers(imageCopy, markerCorners, markerIds);
-                std::vector<cv::Point2f> charucoCorners;
-                std::vector<int> charucoIds;
-                cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, board, charucoCorners, charucoIds, cameraMatrix, distCoeffs);
-                // if at least one charuco corner detected
-                if (charucoIds.size() > 0) {
-                    cv::Scalar color = cv::Scalar(255, 0, 0);
-                    cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds, color);
-                    cv::Vec3d rvec, tvec;
-                    // cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
-                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeffs, rvec, tvec);
-                    // if charuco pose is valid
-                    if (valid)
-                        cv::aruco::drawAxis(imageCopy, cameraMatrix, distCoeffs, rvec, tvec, 0.1f);
-                }
-            }
-            k_dev.releaseFrames();
-            cv::imshow("out", imageCopy);
-            char key = (char)cv::waitKey(30);
-            if (key == 27)
-                break;
-        }
+  auto fp = reinterpret_cast<float *>(data);
+
+  for (auto i = 0; i < size; ++i, ++fp, ++data)
+    *data = static_cast<unsigned char>(*fp * 255.0f);
 }
-void detectCharucoBoardWithoutCalibration()
+
+enum class FrameGrabberType
 {
-    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04f, 0.02f, dictionary);
-    cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
-    params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;
-    while (true) {
-        cv::Mat imageCopy;
-        k_dev.waitForFrames(10);
-        libfreenect2::Frame *rgb = k_dev.frames[libfreenect2::Frame::Color];
-        libfreenect2::Frame *ir = k_dev.frames[libfreenect2::Frame::Ir];
-        libfreenect2::Frame *depth = k_dev.frames[libfreenect2::Frame::Depth];
-        auto image =
-          cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
-        cv::flip(image, image, 1);
+  RGB,
+  IR,
+  FILE,
+  UNKNOWN,
+};
+
+struct FrameGrabber
+{
+  FrameGrabber(FrameGrabberType type,
+               kinect &kdev,
+               std::vector<std::string> &&filenames = {})
+    : type(type)
+    , kdev(kdev)
+    , filenames(std::move(filenames))
+    , next_file(std::begin(filenames))
+    , last_file(std::cend(filenames))
+  {}
+
+  std::optional<cv::Mat>
+  grab(kinect &kdev)
+  {
+    if (!kdev.waitForFrames(10))
+      return std::nullopt;
+
+    cv::Mat image;
+
+    switch (this->type)
+    {
+      case FrameGrabberType::RGB: {
+        libfreenect2::Frame *rgb = kdev.frames[libfreenect2::Frame::Color];
+        image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
         cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
-        image.copyTo(imageCopy);
-        std::vector<int> markerIds;
-        std::vector<std::vector<cv::Point2f> > markerCorners;
-        cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
-        //or
-        //cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds, params);
-        // if at least one marker detected
-        if (markerIds.size() > 0) {
-            cv::aruco::drawDetectedMarkers(imageCopy, markerCorners, markerIds);
-            std::vector<cv::Point2f> charucoCorners;
-            std::vector<int> charucoIds;
-            cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, board, charucoCorners, charucoIds);
-            // if at least one charuco corner detected
-            if (charucoIds.size() > 0)
-                cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+
+        cv::flip(image, image, 1);
+        break;
+      }
+
+      case FrameGrabberType::IR: {
+        libfreenect2::Frame *ir = kdev.frames[libfreenect2::Frame::Ir];
+
+        depthProcess(ir);
+        conv32FC1To8CU1(ir->data, ir->height * ir->width);
+
+        image = cv::Mat(ir->height, ir->width, CV_8UC1, ir->data);
+        cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
+
+        cv::flip(image, image, 1);
+        return image;
+        break;
+      }
+
+      case FrameGrabberType::FILE: {
+        if (next_file != last_file)
+        {
+          image = cv::imread(*next_file);
+          ++next_file;
         }
-        k_dev.releaseFrames();
-        cv::imshow("out", imageCopy);
-        char key = (char)cv::waitKey(30);
-        if (key == 27)
-            break;
+        else
+        {
+          return std::nullopt;
+        }
+      }
+
+      case FrameGrabberType::UNKNOWN: {
+        assert(false);
+      }
     }
+
+    return image;
+  }
+
+  const FrameGrabberType type = FrameGrabberType::UNKNOWN;
+  const std::vector<std::string> filenames;
+  std::vector<std::string>::iterator next_file;
+  const std::vector<std::string>::const_iterator last_file;
+  kinect &kdev;
+};
+
+static auto
+charuco_find_precalib(kinect &kdev, FrameGrabber fg)
+{
+  cv::Ptr<cv::aruco::DetectorParameters> params =
+    cv::aruco::DetectorParameters::create();
+  std::vector<std::vector<cv::Point2f>> all_charuco_corners;
+  std::vector<std::vector<int>> all_charuco_ids;
+
+  bool save_next = false;
+
+  while (1)
+  {
+    std::optional opt_image = fg.grab(kdev);
+
+    if (!opt_image)
+      break;
+
+    cv::Mat image = opt_image.value(), image_copy;
+
+    image.copyTo(image_copy);
+    std::vector<int> marker_ids;
+    std::vector<std::vector<cv::Point2f>> marker_corners;
+    cv::aruco::detectMarkers(
+      image, chboard->dictionary, marker_corners, marker_ids, params);
+
+    if (marker_ids.size() > 0)
+    {
+      cv::aruco::drawDetectedMarkers(
+        image_copy, marker_corners, marker_ids);
+      std::vector<cv::Point2f> charuco_corners;
+      std::vector<int> charuco_ids;
+      cv::aruco::interpolateCornersCharuco(marker_corners,
+                                           marker_ids,
+                                           image,
+                                           chboard,
+                                           charuco_corners,
+                                           charuco_ids);
+
+      if (charuco_ids.size() > 0)
+      {
+        cv::aruco::drawDetectedCornersCharuco(
+          image_copy, charuco_corners, charuco_ids, cv::Scalar(255, 0, 0));
+        if (save_next)
+        {
+          save_next = false;
+          all_charuco_ids.emplace_back(std::move(charuco_ids));
+          all_charuco_corners.emplace_back(std::move(charuco_corners));
+
+          fmt::print("Saved charuco frame\n");
+        }
+      }
+    }
+
+    cv::imshow("out", image_copy);
+    char key = (char)cv::waitKey(30);
+
+    if (key == 'q')
+      break;
+    else if (key == ' ')
+      save_next = true;
+
+    kdev.releaseFrames();
+  }
+
+  return std::make_tuple(std::move(all_charuco_corners),
+                         std::move(all_charuco_ids));
 }
 
-int main(int argc, char* argv[])
+constexpr auto settings_filename = "charuco_settings.yaml";
+
+static void
+save_settings(cv::Mat &camera_matrix,
+              cv::Mat &dist_coeffs,
+              std::string_view filename)
 {
-    cv::CommandLineParser parser(argc, argv, keys);
-    parser.about(about);
-    if (argc < 2) {
-        parser.printMessage();
-        return 0;
-    }
-    int choose = parser.get<int>("c");
-    switch (choose) {
-    case 1:
-        createBoard();
-        std::cout << "An image named BoardImg.jpg is generated in folder containing this file" << std::endl;
-        break;
-    case 2:
-        detectCharucoBoardWithoutCalibration();
-        break;
-    case 3:
-        detectCharucoBoardWithCalibrationPose();
-        break;
-    default:
-        break;
-    }
+  cv::FileStorage fs(filename.data(), cv::FileStorage::WRITE);
+
+  if (!fs.isOpened())
+  {
+    fmt::print("Warning failed to save settings.\n");
+    return;
+  }
+
+  fs << "camera_matrix" << camera_matrix;
+  fs << "dist_coeffs" << dist_coeffs;
+}
+
+static void
+load_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
+{
+  cv::FileStorage fs(settings_filename, cv::FileStorage::READ);
+
+  if (!fs.isOpened())
+  {
+    fmt::print("Warning failed to load settings.\n");
+    return;
+  }
+
+  fs["camera_matrix"] >> camera_matrix;
+  fs["dist_coeffs"] >> dist_coeffs;
+}
+
+static int
+manual_calib(std::string color_type_str, std::string_view outfile)
+{
+  FrameGrabberType image_type;
+
+  std::for_each(std::begin(color_type_str),
+                std::end(color_type_str),
+                [](char &c) { c = std::toupper(c); });
+
+  if (color_type_str == "" || color_type_str == "RGB")
+  {
+    image_type = FrameGrabberType::RGB;
+  }
+  else if (color_type_str == "IR")
+  {
+    image_type = FrameGrabberType::IR;
+  }
+  else
+  {
+    puts("Unknown image type. Try RGB or IR\n");
+    return 1;
+  }
+
+  kinect kdev(0);
+  FrameGrabber grabber(image_type, kdev);
+
+  auto [charuco_corners, charuco_ids] =
+    charuco_find_precalib(kdev, grabber);
+
+  cv::Mat camera_matrix, dist_coeffs;
+  std::vector<cv::Mat> rvecs, tvecs;
+
+  cv::aruco::calibrateCameraCharuco(charuco_corners,
+                                    charuco_ids,
+                                    chboard,
+                                    img_size,
+                                    camera_matrix,
+                                    dist_coeffs,
+                                    rvecs,
+                                    tvecs,
+                                    0);
+
+  save_settings(camera_matrix, dist_coeffs, outfile);
+
+  return 0;
+}
+
+static int
+auto_calib(std::vector<std::string> &&filenames, std::string_view outfile)
+{
+  kinect kdev = kinect::nodev();
+  FrameGrabber grabber(FrameGrabberType::FILE, kdev, std::move(filenames));
+
+  auto [charuco_corners, charuco_ids] =
+    charuco_find_precalib(kdev, grabber);
+
+  cv::Mat camera_matrix, dist_coeffs;
+  std::vector<cv::Mat> rvecs, tvecs;
+
+  cv::aruco::calibrateCameraCharuco(charuco_corners,
+                                    charuco_ids,
+                                    chboard,
+                                    img_size,
+                                    camera_matrix,
+                                    dist_coeffs,
+                                    rvecs,
+                                    tvecs,
+                                    0);
+
+  save_settings(camera_matrix, dist_coeffs, outfile);
+
+  return 0;
+}
+
+namespace popt = boost::program_options;
+
+int
+main(int argc, char **argv)
+{
+  popt::options_description desc;
+
+  // clang-format off
+  desc.add_options()
+    ("help", "Shows this message")
+
+    ("type",popt::value<std::string>()->default_value("manual"),
+    "Calibration type: \"manual\" or \"auto\".")
+
+    ("format", popt::value<std::string>()->default_value("RGB"),
+    "Image format: \"RGB\" or \"IR\". (used only if type == \"manual\")")
+
+    ("outfile", popt::value<std::string>()->default_value(settings_filename),
+    "Output filename.");
+  // clang-format on
+
+  popt::variables_map vm;
+  popt::parsed_options parsed = popt::command_line_parser(argc, argv)
+                                  .options(desc)
+                                  .allow_unregistered()
+                                  .run();
+  popt::store(parsed, vm);
+  popt::notify(vm);
+
+  if (vm.count("help"))
+  {
+    fmt::print("{}\n", desc);
     return 0;
+  }
+
+  auto calib_type = vm["type"].as<std::string>();
+  auto format = vm["format"].as<std::string>();
+  auto outfile = vm["outfile"].as<std::string>();
+
+  fmt::print("Got {} {} {}\n", calib_type, format, outfile);
+
+  if (calib_type == "manual")
+  {
+    return manual_calib(format, outfile);
+  }
+  else if (calib_type == "auto")
+  {
+    std::vector<std::string> filenames =
+      popt::collect_unrecognized(parsed.options, popt::include_positional);
+    return auto_calib(std::move(filenames), outfile);
+  }
+
+  fmt::print("{}\n", desc);
 }
