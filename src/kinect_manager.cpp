@@ -5,7 +5,6 @@ kinect::kinect()
   : listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir |
              libfreenect2::Frame::Depth)
 {
-  this->open(0);
 }
 
 kinect::kinect(int d_idx)
