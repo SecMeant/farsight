@@ -22,9 +22,9 @@
 #include <fmt/ostream.h>
 
 const cv::Ptr<cv::aruco::Dictionary> dict =
-  cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+  cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_250);
 const cv::Ptr<cv::aruco::CharucoBoard> chboard =
-  cv::aruco::CharucoBoard::create(5, 7, 0.035f, 0.021f, dict);
+  cv::aruco::CharucoBoard::create(6, 9, 0.035f, 0.021f, dict);
 const cv::Size img_size(1080, 1920);
 
 void
@@ -108,6 +108,7 @@ struct FrameGrabber
         if (next_file != last_file)
         {
           image = cv::imread(*next_file);
+          cv::flip(image, image, 1);
           ++next_file;
         }
         else
