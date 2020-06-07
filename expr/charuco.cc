@@ -22,9 +22,9 @@
 #include <fmt/ostream.h>
 
 const cv::Ptr<cv::aruco::Dictionary> dict =
-  cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+  cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_250);
 const cv::Ptr<cv::aruco::CharucoBoard> chboard =
-  cv::aruco::CharucoBoard::create(5, 7, 0.035f, 0.021f, dict);
+  cv::aruco::CharucoBoard::create(6, 9, 0.035f, 0.021f, dict);
 const cv::Size img_size(1080, 1920);
 
 void
@@ -64,8 +64,8 @@ struct FrameGrabber
     : type(type)
     , kdev(kdev)
     , filenames(std::move(filenames))
-    , next_file(std::begin(filenames))
-    , last_file(std::cend(filenames))
+    , next_file(std::cbegin(this->filenames))
+    , last_file(std::cend(this->filenames))
   {}
 
   std::optional<cv::Mat>
@@ -108,16 +108,20 @@ struct FrameGrabber
         if (next_file != last_file)
         {
           image = cv::imread(*next_file);
+          cv::flip(image, image, 1);
           ++next_file;
         }
         else
         {
           return std::nullopt;
         }
+
+        break;
       }
 
       case FrameGrabberType::UNKNOWN: {
         assert(false);
+        break;
       }
     }
 
@@ -126,8 +130,7 @@ struct FrameGrabber
 
   const FrameGrabberType type = FrameGrabberType::UNKNOWN;
   const std::vector<std::string> filenames;
-  std::vector<std::string>::iterator next_file;
-  const std::vector<std::string>::const_iterator last_file;
+  std::vector<std::string>::const_iterator next_file, last_file;
   kinect &kdev;
 };
 
@@ -138,8 +141,6 @@ charuco_find_precalib(kinect &kdev, FrameGrabber fg)
     cv::aruco::DetectorParameters::create();
   std::vector<std::vector<cv::Point2f>> all_charuco_corners;
   std::vector<std::vector<int>> all_charuco_ids;
-
-  bool save_next = false;
 
   while (1)
   {
@@ -173,24 +174,10 @@ charuco_find_precalib(kinect &kdev, FrameGrabber fg)
       {
         cv::aruco::drawDetectedCornersCharuco(
           image_copy, charuco_corners, charuco_ids, cv::Scalar(255, 0, 0));
-        if (save_next)
-        {
-          save_next = false;
-          all_charuco_ids.emplace_back(std::move(charuco_ids));
-          all_charuco_corners.emplace_back(std::move(charuco_corners));
-
-          fmt::print("Saved charuco frame\n");
-        }
+        all_charuco_ids.emplace_back(std::move(charuco_ids));
+        all_charuco_corners.emplace_back(std::move(charuco_corners));
       }
     }
-
-    cv::imshow("out", image_copy);
-    char key = (char)cv::waitKey(30);
-
-    if (key == 'q')
-      break;
-    else if (key == ' ')
-      save_next = true;
 
     kdev.releaseFrames();
   }
@@ -355,8 +342,11 @@ main(int argc, char **argv)
     std::vector<std::string> filenames =
       popt::collect_unrecognized(parsed.options, popt::include_positional);
 
-    if (filenames.size() == 0) {
-      fmt::print(stderr, "--type=auto expects list of files to process as arguments\n");
+    if (filenames.size() == 0)
+    {
+      fmt::print(
+        stderr,
+        "--type=auto expects list of files to process as arguments\n");
       return 1;
     }
 

@@ -19,6 +19,8 @@ file(GLOB CXX_SRC src/*.cc src/*.cpp)
 set(CMAKE_CXX_STANDARD 17)
 include_directories(inc/)
 
+add_compile_options("-Wimplicit-fallthrough")
+
 if (BUILD_EXPERIMENTS)
 	add_executable(aruco expr/aruco.cc)
         add_executable(kinect_decoder expr/kinect_decoder.cc)
