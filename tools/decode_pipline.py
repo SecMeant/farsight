@@ -14,10 +14,10 @@ decoder_exe = os.path.realpath(sys.argv[1])
 charuco_exe = os.path.realpath(sys.argv[2])
 real_dir= os.path.realpath(sys.argv[3])
 dir_name = ntpath.basename(real_dir)
-dec_dir= os.path.realpath(real_dir + "/../decompressed_{}".format(dir_name))
+dec_dir= os.path.realpath("decompressed_{}".format(dir_name))
 
 if not os.path.exists(dec_dir):
-   os.mkdir(dec_dir)
+   os.makedirs(dec_dir)
 
 for file in glob.glob(real_dir+"/*"):
     file_name = ntpath.basename(file)
@@ -34,9 +34,7 @@ generated_ir = dec_dir + "/ir/*"
 
 rgb_list = glob.glob(generated_rgb)
 ir_list = glob.glob(generated_ir)
+print([charuco_exe, "--outfile", "rgb.yaml", "--type", "auto"] + rgb_list)
 
-print(rgb_list)
-print(ir_list)
-
-subprocess.call([charuco_exe, "--outfile rgb.yaml", "--type auto"] + rgb_list)
-subprocess.call([charuco_exe, "--outfile ir.yaml", "--type auto"] + ir_list)
+subprocess.call([charuco_exe, "--outfile", "rgb.yaml", "--type", "auto"] + rgb_list)
+subprocess.call([charuco_exe, "--outfile", "ir.yaml", "--type", "auto"] + ir_list)
