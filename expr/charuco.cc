@@ -21,11 +21,48 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
+const cv::Size chessboard_size(6,9);
+const cv::Size2f chessboard_real_size(0.08f, 0.08f);
 const cv::Ptr<cv::aruco::Dictionary> dict =
   cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_250);
 const cv::Ptr<cv::aruco::CharucoBoard> chboard =
   cv::aruco::CharucoBoard::create(6, 9, 0.035f, 0.021f, dict);
 const cv::Size img_size(1080, 1920);
+
+constexpr auto settings_filename = "charuco_settings.yaml";
+
+static void
+save_settings(cv::Mat &camera_matrix,
+              cv::Mat &dist_coeffs,
+              std::string_view filename)
+{
+  cv::FileStorage fs(filename.data(), cv::FileStorage::WRITE);
+
+  if (!fs.isOpened())
+  {
+    fmt::print("Warning failed to save settings.\n");
+    return;
+  }
+
+  fs << "camera_matrix" << camera_matrix;
+  fs << "dist_coeffs" << dist_coeffs;
+}
+
+static void
+load_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
+{
+  cv::FileStorage fs(settings_filename, cv::FileStorage::READ);
+
+  if (!fs.isOpened())
+  {
+    fmt::print("Warning failed to load settings.\n");
+    return;
+  }
+
+  fs["camera_matrix"] >> camera_matrix;
+  fs["dist_coeffs"] >> dist_coeffs;
+}
+
 
 void
 depthProcess(libfreenect2::Frame *frame)
@@ -76,11 +113,13 @@ struct FrameGrabber
     switch (this->type)
     {
       case FrameGrabberType::RGB: {
+
         if (!kdev.waitForFrames(10))
           return std::nullopt;
 
         libfreenect2::Frame *rgb = kdev.frames[libfreenect2::Frame::Color];
-        image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
+        image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data).clone();
+        kdev.releaseFrames();
         cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
 
         cv::flip(image, image, 1);
@@ -88,6 +127,7 @@ struct FrameGrabber
       }
 
       case FrameGrabberType::IR: {
+
         if (!kdev.waitForFrames(10))
           return std::nullopt;
 
@@ -96,7 +136,8 @@ struct FrameGrabber
         depthProcess(ir);
         conv32FC1To8CU1(ir->data, ir->height * ir->width);
 
-        image = cv::Mat(ir->height, ir->width, CV_8UC1, ir->data);
+        image = cv::Mat(ir->height, ir->width, CV_8UC1, ir->data).clone();
+        kdev.releaseFrames();
         cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
 
         cv::flip(image, image, 1);
@@ -120,8 +161,14 @@ struct FrameGrabber
 
       case FrameGrabberType::UNKNOWN: {
         assert(false);
-        break;
+        return std::nullopt;
       }
+    }
+
+    if (this->type != FrameGrabberType::FILE) {
+      cv::imshow("image", image);
+      if (cv::waitKey(10) == 'q')
+        return std::nullopt;
     }
 
     return image;
@@ -132,6 +179,89 @@ struct FrameGrabber
   std::vector<std::string>::const_iterator next_file, last_file;
   kinect &kdev;
 };
+
+static auto
+chessboard_calib(kinect &kdev, FrameGrabber fg, std::string_view outfile)
+{
+  // Creating vector to store vectors of 3D points for each checkerboard
+  // image
+  std::vector<std::vector<cv::Point3f>> objpoints;
+
+  // Creating vector to store vectors of 2D points for each checkerboard
+  // image
+  std::vector<std::vector<cv::Point2f>> imgpoints;
+
+  // Defining the world coordinates for 3D points
+  std::vector<cv::Point3f> objp;
+  for (int i{ 0 }; i < chessboard_size.width; i++)
+  {
+    for (int j{ 0 }; j < chessboard_size.height; j++)
+      objp.push_back(cv::Point3f(j * 0.08, i * 0.08, 0));
+  }
+
+  // vector to store the pixel coordinates of detected checker board
+  // corners
+  std::vector<cv::Point2f> corner_pts;
+  bool success;
+
+  cv::Mat camera_matrix, dist_coeffs, rvecs, tvecs;
+
+  while (1)
+  {
+    std::optional opt_image = fg.grab(kdev);
+
+    if (!opt_image)
+      break;
+
+    cv::Mat image = opt_image.value();
+
+    // Finding checker board corners
+    // If desired number of corners are found in the image then success =
+    // true
+    success = cv::findChessboardCorners(
+      image,
+      chessboard_size,
+      corner_pts,
+      cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
+
+    /*
+     * If desired number of corner are detected,
+     * we refine the pixel coordinates and display
+     * them on the images of checker board
+     */
+    if (success)
+    {
+      cv::TermCriteria criteria(
+        cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 30, 0.001);
+
+      // refining pixel coordinates for given 2d points.
+      //cv::cornerSubPix(
+      //  image, corner_pts, cv::Size(11, 11), cv::Size(-1, -1), criteria);
+
+      // Displaying the detected corner points on the checker board
+      cv::drawChessboardCorners(image,
+                                chessboard_size,
+                                corner_pts,
+                                success);
+
+      objpoints.push_back(objp);
+      imgpoints.push_back(corner_pts);
+    }
+  }
+
+  if (objpoints.size() == 0)
+    return;
+
+  cv::calibrateCamera(objpoints,
+                      imgpoints,
+                      img_size,
+                      camera_matrix,
+                      dist_coeffs,
+                      rvecs,
+                      tvecs);
+
+  save_settings(camera_matrix, dist_coeffs, outfile);
+}
 
 static auto
 charuco_find_precalib(kinect &kdev, FrameGrabber fg)
@@ -185,42 +315,37 @@ charuco_find_precalib(kinect &kdev, FrameGrabber fg)
                          std::move(all_charuco_ids));
 }
 
-constexpr auto settings_filename = "charuco_settings.yaml";
-
-static void
-save_settings(cv::Mat &camera_matrix,
-              cv::Mat &dist_coeffs,
-              std::string_view filename)
+static int
+calibrate_and_save(kinect &kdev, FrameGrabber &grabber, std::string_view outfile, bool is_simple)
 {
-  cv::FileStorage fs(filename.data(), cv::FileStorage::WRITE);
-
-  if (!fs.isOpened())
-  {
-    fmt::print("Warning failed to save settings.\n");
-    return;
+  if (is_simple) {
+    chessboard_calib(kdev, grabber, outfile);
+    return 0;
   }
 
-  fs << "camera_matrix" << camera_matrix;
-  fs << "dist_coeffs" << dist_coeffs;
-}
+  auto [charuco_corners, charuco_ids] =
+    charuco_find_precalib(kdev, grabber);
 
-static void
-load_settings(cv::Mat &camera_matrix, cv::Mat &dist_coeffs)
-{
-  cv::FileStorage fs(settings_filename, cv::FileStorage::READ);
+  cv::Mat camera_matrix, dist_coeffs;
+  std::vector<cv::Mat> rvecs, tvecs;
 
-  if (!fs.isOpened())
-  {
-    fmt::print("Warning failed to load settings.\n");
-    return;
-  }
+  cv::aruco::calibrateCameraCharuco(charuco_corners,
+                                    charuco_ids,
+                                    chboard,
+                                    img_size,
+                                    camera_matrix,
+                                    dist_coeffs,
+                                    rvecs,
+                                    tvecs,
+                                    0);
 
-  fs["camera_matrix"] >> camera_matrix;
-  fs["dist_coeffs"] >> dist_coeffs;
+  save_settings(camera_matrix, dist_coeffs, outfile);
+
+  return 0;
 }
 
 static int
-manual_calib(std::string color_type_str, std::string_view outfile)
+manual_calib(std::string color_type_str, std::string_view outfile, bool is_simple)
 {
   FrameGrabberType image_type;
 
@@ -245,52 +370,16 @@ manual_calib(std::string color_type_str, std::string_view outfile)
   kinect kdev(0);
   FrameGrabber grabber(image_type, kdev);
 
-  auto [charuco_corners, charuco_ids] =
-    charuco_find_precalib(kdev, grabber);
-
-  cv::Mat camera_matrix, dist_coeffs;
-  std::vector<cv::Mat> rvecs, tvecs;
-
-  cv::aruco::calibrateCameraCharuco(charuco_corners,
-                                    charuco_ids,
-                                    chboard,
-                                    img_size,
-                                    camera_matrix,
-                                    dist_coeffs,
-                                    rvecs,
-                                    tvecs,
-                                    0);
-
-  save_settings(camera_matrix, dist_coeffs, outfile);
-
-  return 0;
+  return calibrate_and_save(kdev, grabber, outfile, is_simple);
 }
 
 static int
-auto_calib(std::vector<std::string> &&filenames, std::string_view outfile)
+auto_calib(std::vector<std::string> &&filenames, std::string_view outfile, bool is_simple)
 {
   kinect kdev = kinect::nodev();
   FrameGrabber grabber(FrameGrabberType::FILE, kdev, std::move(filenames));
 
-  auto [charuco_corners, charuco_ids] =
-    charuco_find_precalib(kdev, grabber);
-
-  cv::Mat camera_matrix, dist_coeffs;
-  std::vector<cv::Mat> rvecs, tvecs;
-
-  cv::aruco::calibrateCameraCharuco(charuco_corners,
-                                    charuco_ids,
-                                    chboard,
-                                    img_size,
-                                    camera_matrix,
-                                    dist_coeffs,
-                                    rvecs,
-                                    tvecs,
-                                    0);
-
-  save_settings(camera_matrix, dist_coeffs, outfile);
-
-  return 0;
+  return calibrate_and_save(kdev, grabber, outfile, is_simple);
 }
 
 namespace popt = boost::program_options;
@@ -317,6 +406,8 @@ main(int argc, char **argv)
     ("format", popt::value<std::string>()->default_value("RGB"),
     "Image format: \"RGB\" or \"IR\". (used only live video used)")
 
+    ("chessboard", "Enables simple, chessboard calibration.\n")
+
     ("outfile", popt::value<std::string>()->default_value(settings_filename),
     "Output filename.");
   // clang-format on
@@ -342,8 +433,10 @@ main(int argc, char **argv)
   std::vector<std::string> filenames =
     popt::collect_unrecognized(parsed.options, popt::include_positional);
 
+  bool is_simple = vm.count("chessboard");
+
   if (filenames.size() == 0)
-    return manual_calib(format, outfile);
+    return manual_calib(format, outfile, is_simple);
   else
-    return auto_calib(std::move(filenames), outfile);
+    return auto_calib(std::move(filenames), outfile, is_simple);
 }
