@@ -292,7 +292,9 @@ findAruco(const cv::Mat &f_)
   // camera parameters are read from somewhere
   cv::Ptr<cv::aruco::Dictionary> dictionary =
     cv::aruco::getPredefinedDictionary(cv::aruco::DICT_5X5_50);
-  cv::aruco::detectMarkers(f, dictionary, corners, ids);
+  cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
+  params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_SUBPIX;
+  cv::aruco::detectMarkers(f, dictionary, corners, ids, params);
   // if at least one marker detected
   if (ids.size() > 0)
   {
@@ -395,7 +397,6 @@ generateScene(const libfreenect2::Registration &reg,
       }
     }
   }
-  findCameraOffsetDiff(reg, f, gtvec);
   fmt::print("Updating opengl\n");
   fmt::print("tvec {} {} {} \n", gtvec.x, gtvec.y, gtvec.z);
   farsight::camera2real(pointMap, gtvec, grmat, ids[0]);
@@ -480,20 +481,20 @@ void calibrateCamera(kinect &dev)
   auto ir_params =  dev.getIRParams();
   auto color_params =  dev.getColorParams();
 
-  color_params.fx = cameraMatrix.at<float>(0,0);
-  color_params.fy = cameraMatrix.at<float>(1,1);
-  color_params.cx = cameraMatrix.at<float>(0,2);
-  color_params.cy = cameraMatrix.at<float>(1,2);
+  color_params.fx = cameraMatrix.at<double>(0,0);
+  color_params.fy = cameraMatrix.at<double>(1,1);
+  color_params.cx = cameraMatrix.at<double>(0,2);
+  color_params.cy = cameraMatrix.at<double>(1,2);
 
-  ir_params.fx = cameraMatrixIR.at<float>(0,0);
-  ir_params.fy = cameraMatrixIR.at<float>(1,1);
-  ir_params.cx = cameraMatrixIR.at<float>(0,2);
-  ir_params.cy = cameraMatrixIR.at<float>(1,2);
-  ir_params.k1 = distCoeffsIR.at<float>(0);
-  ir_params.k2 = distCoeffsIR.at<float>(1);
-  ir_params.p1 = distCoeffsIR.at<float>(2);
-  ir_params.p2 = distCoeffsIR.at<float>(3);
-  ir_params.k3 = distCoeffsIR.at<float>(4);
+  ir_params.fx = cameraMatrixIR.at<double>(0,0);
+  ir_params.fy = cameraMatrixIR.at<double>(1,1);
+  ir_params.cx = cameraMatrixIR.at<double>(0,2);
+  ir_params.cy = cameraMatrixIR.at<double>(1,2);
+  ir_params.k1 = distCoeffsIR.at<double>(0);
+  ir_params.k2 = distCoeffsIR.at<double>(1);
+  ir_params.p1 = distCoeffsIR.at<double>(2);
+  ir_params.p2 = distCoeffsIR.at<double>(3);
+  ir_params.k3 = distCoeffsIR.at<double>(4);
   dev.open(0);
   dev.setIRParams(ir_params);
   dev.setColorParams(color_params);
