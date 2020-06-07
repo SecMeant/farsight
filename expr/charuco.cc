@@ -71,14 +71,14 @@ struct FrameGrabber
   std::optional<cv::Mat>
   grab(kinect &kdev)
   {
-    if (!kdev.waitForFrames(10))
-      return std::nullopt;
-
     cv::Mat image;
 
     switch (this->type)
     {
       case FrameGrabberType::RGB: {
+        if (!kdev.waitForFrames(10))
+          return std::nullopt;
+
         libfreenect2::Frame *rgb = kdev.frames[libfreenect2::Frame::Color];
         image = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
         cv::cvtColor(image, image, cv::COLOR_BGRA2BGR);
@@ -88,6 +88,9 @@ struct FrameGrabber
       }
 
       case FrameGrabberType::IR: {
+        if (!kdev.waitForFrames(10))
+          return std::nullopt;
+
         libfreenect2::Frame *ir = kdev.frames[libfreenect2::Frame::Ir];
 
         depthProcess(ir);
@@ -343,8 +346,6 @@ main(int argc, char **argv)
   auto format = vm["format"].as<std::string>();
   auto outfile = vm["outfile"].as<std::string>();
 
-  fmt::print("Got {} {} {}\n", calib_type, format, outfile);
-
   if (calib_type == "manual")
   {
     return manual_calib(format, outfile);
@@ -353,6 +354,12 @@ main(int argc, char **argv)
   {
     std::vector<std::string> filenames =
       popt::collect_unrecognized(parsed.options, popt::include_positional);
+
+    if (filenames.size() == 0) {
+      fmt::print(stderr, "--type=auto expects list of files to process as arguments\n");
+      return 1;
+    }
+
     return auto_calib(std::move(filenames), outfile);
   }
 
