@@ -107,10 +107,11 @@ int main(int argc, char **argv)
     }
    }
 
-   std::string dir_rgb = fmt::format("{}_rgb", data->serialNumber);
-   std::string dir_ir = fmt::format("{}_ir", data->serialNumber);
-
    std::string f_name = fs::path(file_path).filename();
+   std::string p_path = fs::path(file_path).parent_path();
+
+   std::string dir_rgb = fmt::format("{}/rgb",p_path, data->serialNumber);
+   std::string dir_ir = fmt::format("{}/ir", p_path, data->serialNumber);
 
    if(!fs::exists(dir_rgb))
        fs::create_directory(fmt::format("{}",dir_rgb));
