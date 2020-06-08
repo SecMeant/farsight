@@ -171,6 +171,9 @@ struct FrameGrabber
         return std::nullopt;
     }
 
+    if (image.empty())
+      return std::nullopt;
+
     return image;
   }
 
