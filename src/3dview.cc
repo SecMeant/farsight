@@ -272,10 +272,12 @@ Keyboard(unsigned char key, int x, int y)
 
     case '+':
       tspeed *= 2;
+      rotangle *= 2;
       break;
 
     case '-':
       tspeed /= 2;
+      rotangle /= 2;
       break;
 
     case 'q':
