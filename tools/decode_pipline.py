@@ -36,5 +36,5 @@ rgb_list = glob.glob(generated_rgb)
 ir_list = glob.glob(generated_ir)
 print([charuco_exe, "--outfile", "rgb.yaml", "--type", "auto"] + rgb_list)
 
-subprocess.call([charuco_exe, "--outfile", "rgb.yaml", "--type", "auto"] + rgb_list)
-subprocess.call([charuco_exe, "--outfile", "ir.yaml", "--type", "auto"] + ir_list)
+subprocess.call([charuco_exe, "--outfile", "rgb.yaml", "--chessboard"] + rgb_list)
+subprocess.call([charuco_exe, "--outfile", "ir.yaml", "--chessboard"] + ir_list)
