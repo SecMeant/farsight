@@ -60,10 +60,10 @@ const char *wndname4 = "wnd4";
 const char *wndaruco = "aruco";
 const char *arucoConfigPath = "../../../aruco/aruco.conf";
 static const std::vector<char> base_scenario = { '1', 'b', '2',
-                                                 'b', '1', 'e' };
+                                                 'b', 'e' };
 static const std::vector<char> meassure_scenario = { '1', 'n', '2', 'n',
                                                      '1', 'r', '2', 'r',
-                                                     '1', 'e' };
+                                                      'e' };
 
 std::atomic_flag continue_flag;
 std::vector<cv::String> images;
@@ -210,7 +210,6 @@ calibrateArucoColor()
 void
 calibrateArucoIr()
 {
-
   // Creating vector to store vectors of 3D points for each checkerboard
   // image
   std::vector<std::vector<cv::Point3f>> objpoints;
@@ -287,7 +286,6 @@ findAruco(const cv::Mat &f_)
   cv::Mat f, f2;
   cv::cvtColor(f_, f2, cv::COLOR_BGRA2BGR);
   cv::cvtColor(f2, f, cv::COLOR_BGR2GRAY);
-  //cv::flip(f,f,1);
 
   // camera parameters are read from somewhere
   cv::Ptr<cv::aruco::Dictionary> dictionary =
@@ -421,9 +419,6 @@ createPointMaping(const libfreenect2::Registration &reg,
   farsight::Point3f p{ 0, 0, 0 };
   farsight::PointArray pointMap;
 
-  if (!tvecs.size() || !rvecs.size())
-    return {};
-
   float nan = NAN;
 
   glm::vec3 gtvec = { tvec.x, tvec.y, tvec.z };
@@ -454,12 +449,11 @@ createPointMaping(const libfreenect2::Registration &reg,
         pointMap.push_back({ nan, nan, nan });
         continue;
       }
-
       pointMap.push_back({ p.x, p.y, p.z });
     }
   }
 
-  farsight::camera2real(pointMap, gtvec, grmat, ids[0]);
+  farsight::camera2real(pointMap, gtvec, grmat, 1);
   if (cam == 0)
   {
     farsight::update_points_cam1(pointMap, depth_width);
@@ -476,6 +470,7 @@ on_trackbar(int, void *)
   floor_level = double(floor_level_raw) / floor_level_max;
   fmt::print("CURRENT FLOOR LEVE {}\n", floor_level);
 }
+
 void calibrateCamera(kinect &dev)
 {
   auto ir_params =  dev.getIRParams();
@@ -498,10 +493,10 @@ void calibrateCamera(kinect &dev)
   dev.open(0);
   dev.setIRParams(ir_params);
   dev.setColorParams(color_params);
-  dev.open(1);
-  dev.setIRParams(ir_params);
-  dev.setColorParams(color_params);
-  dev.open(0);
+  //dev.open(1);
+  //dev.setIRParams(ir_params);
+  //dev.setColorParams(color_params);
+  //dev.open(0);
 }
 
 int
@@ -518,7 +513,7 @@ main(int argc, char **argv)
   int c = 0;
   double distance = 0;
   int selectedKinnect = 0;
-  constexpr int filterTimes = 100;
+  constexpr int filterTimes = 10;
   int filterCounter = 0;
   auto scenario_iter = base_scenario.end() - 1;
 
@@ -547,17 +542,18 @@ main(int argc, char **argv)
   byte *depth_backup = nullptr;
   while (continue_flag.test_and_set() and c != 'q')
   {
-    if (!k_dev.waitForFrames(10))
-      break;
+    k_dev.waitForFrames(10);
 
     rgb = k_dev.frames[libfreenect2::Frame::Color];
     ir = k_dev.frames[libfreenect2::Frame::Ir];
     depth = k_dev.frames[libfreenect2::Frame::Depth];
     
-    if(c == 'p')
+    if(c == 'p'){
         memcpy(depth_frame_cpy.data,
           depth->data,
           depth_width * depth_height * sizeof(float));
+    }
+
     depth_backup = depth->data;
 
     if (*scenario_iter == 'b' || *scenario_iter == 'r' || *scenario_iter == 'n')
@@ -750,6 +746,7 @@ main(int argc, char **argv)
       case 'b': {
         fmt::print("Setting {} kinect base image \n", selectedKinnect + 1);
         dec.saveBaseDepthImg(selectedKinnect, image_depth);
+        dec.displayCurrectConfig();
       }
       break;
       case 'n': {
@@ -803,8 +800,11 @@ main(int argc, char **argv)
     {
       stage1.reset();
       depth->data = depth_backup;
-    }else if (*scenario_iter != 'e')
+    }
+
+    if (*scenario_iter != 'e')
     {
+      fmt::print("Scenario iter: {}\n", *scenario_iter);
       scenario_iter++;
     }
 

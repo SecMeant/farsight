@@ -66,7 +66,7 @@ findNearestPoint(const bbox &area, const byte *frame, const byte *filtered)
     pos = y * area.w + x;
 
     if (dep.z > depth[pos] and depth[pos] > 1.0 and
-        !std::isnan(depth[pos]))
+        !std::isnan(depth[pos]) and filtered[pos] != 255)
     {
       dep.z= depth[pos];
       dep.x= x;

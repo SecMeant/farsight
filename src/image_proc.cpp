@@ -18,7 +18,6 @@ bbox detector::detect(int kinectID, byte *frame_object, size_t size, cv::Mat &im
 {
   int lowerb = 0, higherb = 255;
   int lowerb2 = 20, higherb2 = 240;
-
   diff(frame_object, config[kinectID].img_base.ptr(), size);
   auto image_depth_ =
     cv::Mat(depth_height, depth_width, CV_8UC1, frame_object);
@@ -107,6 +106,11 @@ detector::calcBiggestComponent()
         continue;
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }
+  if(pointsCloudTop.size() == 0 || pointsCloudFront.size()==0)
+  {
+      fprintf(stderr, "No points found");
+      return;
+  }
 
   auto rectFront = cv::minAreaRect(pointsCloudFront);
   auto obj_height = rectFront.size.height;
@@ -130,6 +134,10 @@ detector::displayCurrectConfig()
   cv::Mat temp;
 
   matRoi = cv::Rect(0, 0, depth_width, depth_height);
+  resize(cam1.img_base, temp, cv::Size(depth_width, depth_height));
+  temp.copyTo(configScreen(matRoi));
+
+  matRoi = cv::Rect(depth_width, 0, depth_width, depth_height);
   resize(c1_r.imgDepth, temp, cv::Size(depth_width, depth_height));
   cv::putText(temp,
               fmt::format("object {}x{} pixels ", c1_r.area.w, c1_r.area.h),
@@ -139,70 +147,18 @@ detector::displayCurrectConfig()
               cv::Scalar::all(0),
               3,
               5);
-  cv::putText(temp,
-              fmt::format("object depth {} cm ", c1_r.nearest_point.z),
-              { depth_width / 10, 100 },
-              cv::FONT_HERSHEY_PLAIN,
-              2,
-              cv::Scalar::all(0),
-              3,
-              5);
-  temp.copyTo(configScreen(matRoi));
-
-  matRoi = cv::Rect(depth_width, 0, depth_width, depth_height);
-  resize(c1_m.imgDepth, temp, cv::Size(depth_width, depth_height));
-  cv::putText(temp,
-              fmt::format("object {}x{} pixels ", c1_m.area.w, c1_m.area.h),
-              { depth_width / 10, 50 },
-              cv::FONT_HERSHEY_PLAIN,
-              2,
-              cv::Scalar::all(0),
-              3,
-              5);
-  cv::putText(temp,
-              fmt::format("object depth {} cm ", c1_m.nearest_point.z),
-              { depth_width / 10, 100 },
-              cv::FONT_HERSHEY_PLAIN,
-              2,
-              cv::Scalar::all(0),
-              3,
-              5);
   temp.copyTo(configScreen(matRoi));
 
   matRoi = cv::Rect(0, depth_height, depth_width, depth_height);
-  resize(c2_r.imgDepth, temp, cv::Size(depth_width, depth_height));
-  cv::putText(temp,
-              fmt::format("object {}x{} pixels ", c2_r.area.w, c2_r.area.h),
-              { depth_width / 10, 50 },
-              cv::FONT_HERSHEY_PLAIN,
-              2,
-              cv::Scalar::all(0),
-              3,
-              5);
-  cv::putText(temp,
-              fmt::format("object depth {} cm ", c2_r.nearest_point.z),
-              { depth_width / 10, 100 },
-              cv::FONT_HERSHEY_PLAIN,
-              2,
-              cv::Scalar::all(0),
-              3,
-              5);
+  resize(cam2.img_base, temp, cv::Size(depth_width, depth_height));
   temp.copyTo(configScreen(matRoi));
 
   matRoi =
     cv::Rect(depth_width, depth_height, depth_width, depth_height);
-  resize(c2_m.imgDepth, temp, cv::Size(depth_width, depth_height));
+  resize(c2_r.imgDepth, temp, cv::Size(depth_width, depth_height));
   cv::putText(temp,
-              fmt::format("object {}x{} pixels ", c2_m.area.w, c2_m.area.h),
+              fmt::format("object {}x{} pixels ", c2_r.area.w, c2_r.area.h),
               { depth_width / 10, depth_height / 10 },
-              cv::FONT_HERSHEY_PLAIN,
-              2,
-              cv::Scalar::all(0),
-              3,
-              5);
-  cv::putText(temp,
-              fmt::format("object depth {} cm ", c2_m.nearest_point.z),
-              { depth_width / 10, 100 },
               cv::FONT_HERSHEY_PLAIN,
               2,
               cv::Scalar::all(0),
