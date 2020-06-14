@@ -1,5 +1,7 @@
 #include "kinect_manager.hpp"
 #include <fmt/format.h>
+#include <chrono>
+#include <thread>
 
 kinect::kinect()
   : listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir |
@@ -33,7 +35,6 @@ kinect::open(int d_idx)
     this->releaseFrames();
     this->close();
   }
-  isActive = true;
 
   std::string serial = freenect2.getDeviceSerialNumber(d_idx);
 
@@ -47,12 +48,14 @@ kinect::open(int d_idx)
 
   if (!dev->start())
     return false;
+  isActive = true;
 
   fmt::print("Connecting to the device\n"
              "Device serial number	: {}\n"
              "Device firmware	: {}\n",
              dev->getSerialNumber(),
              dev->getFirmwareVersion());
+  std::this_thread::sleep_for(std::chrono::seconds(2));
   return true;
 }
 

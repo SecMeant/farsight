@@ -60,9 +60,9 @@ namespace farsight {
   };
 
   const glm::mat3x3 faces_rotation[6] {
-    [0] = rotmat(Axis::Y, -(M_TAU / 4.0f)),
+    [0] = rotmat(Axis::Y, M_TAU / 4.0f),
     [1] = glm::mat4x4(1.0f),
-    [2] = rotmat(Axis::Y, M_TAU / 4.0f),
+    [2] = rotmat(Axis::Y, -(M_TAU / 4.0f)),
     [3] = rotmat(Axis::X, M_TAU / 4.0f),
     [4] = rotmat(Axis::X, -(M_TAU / 4.0f)),
     [5] = rotmat(Axis::Y, M_TAU / 2.0f)

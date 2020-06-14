@@ -92,20 +92,9 @@ detector::calcBiggestComponent()
     if(std::isnan(p.x))
         continue;
     pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
-  }
-
-  auto fileredPC1 = farsight::get_translated_points_cam1();
-  auto fileredPC2 = farsight::get_translated_points_cam2();
-  std::copy(
-    fileredPC2.begin(), fileredPC2.end(), std::back_inserter(map_top));
-  std::copy(
-    fileredPC2.begin(), fileredPC2.end(), std::back_inserter(map_top));
-  for(auto &p :map_top)
-  {
-    if(std::isnan(p.x))
-        continue;
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }
+
   if(pointsCloudTop.size() == 0 || pointsCloudFront.size()==0)
   {
       fprintf(stderr, "No points found");

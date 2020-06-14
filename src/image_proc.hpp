@@ -40,6 +40,13 @@ public:
   }
 
   void
+  setCameraFaceID(int kinectID, int id)
+  {
+    auto &c = config[kinectID];
+    c.faceID = id;
+  }
+
+  void
   setCameraPos(int kinectID, farsight::Point3f pos)
   {
     auto &c = config[kinectID];
@@ -51,6 +58,13 @@ public:
   {
     auto &c = config[kinectID];
     c.camRot = rot;
+  }
+
+  int
+  getCameraFaceID(int kinectID)
+  {
+    auto &c = config[kinectID];
+    return c.faceID;
   }
 
   const farsight::Point3f&

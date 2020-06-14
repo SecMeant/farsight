@@ -24,6 +24,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/photo.hpp>
 #include <thread>
+#include "disjoint_set.h"
+
 extern "C"
 {
 #include <signal.h>
@@ -36,16 +38,17 @@ struct shared_t
   libfreenect2::Registration &reg;
 };
 static farsight::postprocessing::Stage1 stage1(depth_width, depth_height);
-std::vector<int> ids;
+static std::vector<int> ids;
+static DisjointSet classifier;
 
 constexpr int waitTime = 50;
 
 const int floor_level_max = 1000;
-int floor_level_raw;
+static int floor_level_raw;
 // Defining the dimensions of checkerboard
 static int CHECKERBOARD[2]{ 8, 6 };
-static cv::Mat cameraMatrix, distCoeffs, R, T;
-static cv::Mat cameraMatrixIR, distCoeffsIR, R_IR, T_IR;
+static cv::Mat cameraMatrix, distCoeffs;
+static cv::Mat cameraMatrixIR, distCoeffsIR;
 static std::vector<cv::Vec3d> rvecs, tvecs;
 farsight::Point2i interpol[2];
 double floor_level = 1000.0;
@@ -122,21 +125,12 @@ mouse_event_handler(int event, int x, int y, int flags, void *userdata)
     fmt::print("{} {}\n", x, y);
     fmt::print(
       "Value: {} {} {} {}\n", depth_frame_cpy.data[pos], p.x, p.y, p.z);
-   // interpol[inter_id] = { x, y };
-   // if (inter_id)
-   // {
-   //   floor_level = findFloorLevel(shared->reg);
-   //   fmt::print("Floor level : {}\n", floor_level);
-   // }
-   // fmt::print("point saved under idx = {} \n", inter_id);
-   // inter_id ^= 0x1;
   }
 }
 
 void
 calibrateArucoColor()
 {
-
   // Creating vector to store vectors of 3D points for each checkerboard
   // image
   std::vector<std::vector<cv::Point3f>> objpoints;
@@ -197,7 +191,7 @@ calibrateArucoColor()
       imgpoints.push_back(corner_pts);
     }
   }
-
+  cv::Mat R, T;
   cv::calibrateCamera(objpoints,
                       imgpoints,
                       cv::Size(color_height, color_width),
@@ -271,13 +265,14 @@ calibrateArucoIr()
     }
   }
 
+  cv::Mat R, T;
   cv::calibrateCamera(objpoints,
                       imgpoints,
                       cv::Size(depth_height, depth_width),
                       cameraMatrixIR,
                       distCoeffsIR,
-                      R_IR,
-                      T_IR);
+                      R,
+                      T);
 }
 
 void
@@ -299,10 +294,10 @@ findAruco(const cv::Mat &f_)
     cv::aruco::drawDetectedMarkers(f2, corners, ids);
     cv::aruco::estimatePoseSingleMarkers(
       corners, 0.40, cameraMatrix, distCoeffs, rvecs, tvecs);
-    if (tvecs.size() && rvecs.size())
-    {
-      fmt::print("{} {} {}\n", tvecs[0][0], tvecs[0][1], tvecs[0][2]);
-    }
+   // if (tvecs.size() && rvecs.size())
+   // {
+   //   fmt::print("{} {} {}\n", tvecs[0][0], tvecs[0][1], tvecs[0][2]);
+   // }
     // draw axis for each marker
     for (int i = 0; i < ids.size(); i++)
       cv::aruco::drawAxis(
@@ -413,11 +408,12 @@ createPointMaping(const libfreenect2::Registration &reg,
                   const bbox &b,
                   const farsight::Point3f &tvec,
                   const farsight::Point3f &rvec,
+                  const int id,
                   int cam,
                   double distance)
 {
   farsight::Point3f p{ 0, 0, 0 };
-  farsight::PointArray pointMap;
+  classifier.reset();
 
   float nan = NAN;
 
@@ -438,30 +434,51 @@ createPointMaping(const libfreenect2::Registration &reg,
     }
   }
   int pos;
-  for (int r = b.y; r < b.y + b.h; r++)
+  farsight::PointArray pointMap;
+  for (size_t r = b.y; r < b.y + b.h; r++)
   {
-    for (int c = b.x; c < b.x + b.w; c++)
+    for (size_t c = b.x; c < b.x + b.w; c++)
     {
       pos = r * b.w + c;
       reg.getPointXYZ(f, r, c, p.x, p.y, p.z);
-      if (p.z > distance || filtered[pos] == 255)
-      {
-        pointMap.push_back({ nan, nan, nan });
-        continue;
-      }
       pointMap.push_back({ p.x, p.y, p.z });
     }
   }
 
-  farsight::camera2real(pointMap, gtvec, grmat, 1);
+  farsight::camera2real(pointMap, gtvec, grmat, id);
   if (cam == 0)
   {
     farsight::update_points_cam1(pointMap, depth_width);
-    return farsight::get_translated_points_cam1();
+    pointMap = farsight::get_translated_points_cam1();
+  }
+  else
+  {
+      farsight::update_points_cam2(pointMap, depth_width);
+      pointMap = farsight::get_translated_points_cam2();
+  }
+  for(auto &p : pointMap)
+  {
+    if(p.z > distance)
+        classifier.addPoint({NAN,NAN,NAN});
+    else
+        classifier.addPoint(p); 
   }
 
-  farsight::update_points_cam2(pointMap, depth_width);
-  return farsight::get_translated_points_cam2();
+  auto cat = classifier.findBiggestCategory();
+  pointMap = classifier.getFilteredPoints(cat);
+  
+  if (cam == 0)
+  {
+    farsight::update_points_cam1(pointMap, depth_width);
+    pointMap = farsight::get_translated_points_cam1();
+  }
+  else
+  {
+      farsight::update_points_cam2(pointMap, depth_width);
+      pointMap = farsight::get_translated_points_cam2();
+  }
+   
+  return pointMap;
 }
 
 static void
@@ -495,8 +512,6 @@ void calibrateCamera(kinect &dev)
   dev.setColorParams(color_params);
   //dev.open(1);
   //dev.setIRParams(ir_params);
-  //dev.setColorParams(color_params);
-  //dev.open(0);
 }
 
 int
@@ -520,15 +535,17 @@ main(int argc, char **argv)
   std::thread gl_thread(farsight::init3d);
   gl_thread.detach();
   detector dec;
-  kinect k_dev(selectedKinnect);
-  libfreenect2::Frame undistorted(
-    depth_width, depth_height, sizeof(float)),
-    registered(color_width, color_height, sizeof(unsigned int));
+  kinect k_dev(0);
+  auto irParams0 = k_dev.getIRParams();
+  auto colorParams0 = k_dev.getColorParams();
+  k_dev.open(1);
+  auto irParams1 = k_dev.getIRParams();
+  auto colorParams1 = k_dev.getColorParams();
 
-  libfreenect2::Registration reg(k_dev.getIRParams(),
-                                 k_dev.getColorParams());
+  libfreenect2::Registration reg[2]{{irParams0, colorParams0}, {irParams1, colorParams1}};
+  k_dev.open(selectedKinnect);
 
-  shared_t shared{ std::mutex(), reg };
+  shared_t shared{std::mutex(), reg[selectedKinnect]};
   cv::namedWindow(wndname2, cv::WINDOW_AUTOSIZE);
   cv::setMouseCallback(wndname2, mouse_event_handler, &shared);
 
@@ -547,7 +564,7 @@ main(int argc, char **argv)
     rgb = k_dev.frames[libfreenect2::Frame::Color];
     ir = k_dev.frames[libfreenect2::Frame::Ir];
     depth = k_dev.frames[libfreenect2::Frame::Depth];
-    
+
     if(c == 'p'){
         memcpy(depth_frame_cpy.data,
           depth->data,
@@ -571,7 +588,6 @@ main(int argc, char **argv)
              depth_width * depth_height * sizeof(float));
       depth->data = stage1.get().data;
     }
-
     auto image_rgb = cv::Mat(rgb->height, rgb->width, CV_8UC4, rgb->data);
 
     if (arucoCalibrated == true)
@@ -584,10 +600,11 @@ main(int argc, char **argv)
             const auto &rvec = rvecs[0];
             farsight::Point3f pos(tvec[0], tvec[1], tvec[2]);
             farsight::Point3f rot(rvec[0], rvec[1], rvec[2]);
+            dec.setCameraFaceID(selectedKinnect, ids[0]);
             dec.setCameraPos(selectedKinnect, pos);
             dec.setCameraRot(selectedKinnect, rot);
             distance = dec.calcMaxDistance();
-            generateScene(reg, depth, pos, rot, selectedKinnect);
+            generateScene(reg[selectedKinnect], depth, pos, rot, selectedKinnect);
         }
       }
     }
@@ -598,23 +615,21 @@ main(int argc, char **argv)
       cv::Mat(depth->height, depth->width, CV_8UC1, depth->data);
     switch (c)
     {
+      case 'e':
+        calibrateArucoColor();
+        calibrateArucoIr();
+        break;
       case 'c': {
         cv::glob("../../../aruco/*.jpg", images);
         cv::glob("../../../aruco_ir/*.jpg", images_ir);
         fmt::print("calibration started");
-        calibrateArucoColor();
-        calibrateArucoIr();
         cv::Vec3d tvec;
         cv::Vec3d rvec;
         cv::FileStorage storage(arucoConfigPath, cv::FileStorage::WRITE);
         storage << "cameraMatrix" << cameraMatrix;
         storage << "distCoeffs" << distCoeffs;
-        storage << "R" << R;
-        storage << "T" << T;
         storage << "cameraMatrixIR" << cameraMatrixIR;
         storage << "distCoeffsIR" << distCoeffsIR;
-        storage << "R_IR" << R_IR;
-        storage << "T_IR" << T_IR;
         const auto &pos1 = dec.getCameraPos(0);
         tvec[0] = pos1.x;
         tvec[1] = pos1.y;
@@ -658,9 +673,12 @@ main(int argc, char **argv)
         tvec[1] = glrot2.y;
         tvec[2] = glrot2.z;
         storage << "glrot_cam2" << tvec;
+
+        storage << "face_id_1" << dec.getCameraFaceID(0);
+        storage << "face_id_2" << dec.getCameraFaceID(1);
         storage << "distance" << distance;
         storage << "floor_level" << floor_level;
-        calibrateCamera(k_dev);  
+        //calibrateCamera(k_dev);
         storage.release();
         arucoCalibrated = true;
       }
@@ -669,15 +687,12 @@ main(int argc, char **argv)
         cv::Vec3d vec;
         farsight::Point3f pos;
         glm::vec3 gpos;
+        int faceid;
         cv::FileStorage storage(arucoConfigPath, cv::FileStorage::READ);
         storage["cameraMatrix"] >> cameraMatrix;
         storage["distCoeffs"] >> distCoeffs;
-        storage["R"] >> R;
-        storage["T"] >> T;
         storage["cameraMatrixIR"] >> cameraMatrixIR;
         storage["distCoeffsIR"] >> distCoeffsIR;
-        storage["R_IR"] >> R_IR;
-        storage["T_IR"] >> T_IR;
         storage["tvec_cam1"] >> vec;
         pos.x = vec[0];
         pos.y = vec[1];
@@ -718,12 +733,15 @@ main(int argc, char **argv)
         gpos.y = vec[1];
         gpos.z = vec[2];
         farsight::set_rvec_cam2(gpos);
-        calibrateCamera(k_dev);  
-
+        //calibrateCamera(k_dev);  
+        storage["face_id_1"] >> faceid;
+        dec.setCameraFaceID(0, faceid);
+        storage["face_id_2"] >> faceid;
+        dec.setCameraFaceID(1, faceid);
         storage["distance"] >> distance;
         storage["floor_level"] >> floor_level;
         storage.release();
-        
+
         arucoCalibrated = true;
       }
       break;
@@ -761,18 +779,21 @@ main(int argc, char **argv)
       case 'r': {
         auto depth_cpy = image_depth.clone();
         dec.saveDepthFrame(selectedKinnect, objectType::REFERENCE_OBJ, &depth_frame_cpy);
+        const auto faceid = dec.getCameraFaceID(selectedKinnect);
         const auto &pos = dec.getCameraPos(selectedKinnect);
         const auto &rot = dec.getCameraRot(selectedKinnect);
         auto detectedBox = dec.detect(
           selectedKinnect, depth->data, total_size_depth, depth_cpy);
         const auto &np = dec.getNearestPoint(selectedKinnect == 0 ? 1 : 0);
         double dist = distance - np.z;
-        auto realPoints = createPointMaping(reg,
+        fmt::print("Distance {}, nearest point {}\n", dist, np.z);
+        auto realPoints = createPointMaping(reg[selectedKinnect],
                                             &depth_frame_cpy,
                                             depth->data,
                                             detectedBox,
                                             pos,
                                             rot,
+                                            faceid,
                                             selectedKinnect,
                                             dist);
 

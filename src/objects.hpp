@@ -36,6 +36,7 @@ using objectArray = std::array<object_t, objectsPerCamera>;
 
 struct cameraConfig
 {
+    int faceID;
     farsight::Point3f camPose {0,0,0};
     farsight::Point3f camRot {0,0,0};
     cv::Mat img_base = cv::Mat::zeros(
