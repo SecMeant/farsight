@@ -466,6 +466,14 @@ createPointMaping(const libfreenect2::Registration &reg,
 
   auto cat = classifier.findBiggestCategory();
   pointMap = classifier.getFilteredPoints(cat);
+  if (cam == 0)
+  {
+    farsight::update_points_cam1(pointMap, depth_width);
+  }
+  else
+  {
+    farsight::update_points_cam2(pointMap, depth_width);
+  }
   
   return pointMap;
 }

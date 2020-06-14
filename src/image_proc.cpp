@@ -85,17 +85,50 @@ detector::calcBiggestComponent()
 
   std::copy(
     c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_));
-  //std::copy(
-  // c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
+  FILE *file = fopen("point_cloud_0", "w");
   for(auto &p :map_)
   {
     if(std::isnan(p.x))
         continue;
+    fmt::print(file, "{} {} {}\n", p.x*1000, p.y*1000, p.y*1000);
+    pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
+    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
+  }
+  fclose(file);
+  map_.clear();
+  std::copy(
+    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
+
+  FILE *file2 = fopen("point_cloud_1", "w");
+  for(auto &p :map_)
+  {
+    if(std::isnan(p.x))
+        continue;
+    fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.y*1000);
     pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }
 
-  if(pointsCloudTop.size() == 0 || pointsCloudFront.size()==0)
+  fclose(file2);
+
+  map_.clear();
+  std::copy(
+    c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_));
+  std::copy(
+    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
+
+  FILE *file3 = fopen("point_cloud_2", "w");
+  for(auto &p :map_)
+  {
+    if(std::isnan(p.x))
+        continue;
+    fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.y*1000);
+    pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
+    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
+  }
+  fclose(file3);
+
+  if(pointsCloudTop.size() == 0 || pointsCloudFront.size() == 0)
   {
       fprintf(stderr, "No points found");
       return;
@@ -107,34 +140,8 @@ detector::calcBiggestComponent()
   auto rectTop = cv::minAreaRect(pointsCloudTop);
   auto obj_width = rectTop.size.width;
   auto obj_length = rectTop.size.height;
-  fmt::print("Found object size1 : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
-  
-  map_.clear();
-  pointsCloudFront.clear();
-  pointsCloudTop.clear();
-  std::copy(
-    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
-  for(auto &p :map_)
-  {
-    if(std::isnan(p.x))
-        continue;
-    pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
-    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
-  }
+  fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
 
-  if(pointsCloudTop.size() == 0 || pointsCloudFront.size()==0)
-  {
-      fprintf(stderr, "No points found");
-      return;
-  }
-
-  rectFront = cv::minAreaRect(pointsCloudFront);
-  obj_height = rectFront.size.height;
-
-  rectTop = cv::minAreaRect(pointsCloudTop);
-  obj_width = rectTop.size.width;
-  obj_length = rectTop.size.height;
-  fmt::print("Found object size2 : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
 }
 
 void

@@ -3,13 +3,20 @@
 #include <algorithm>
 #include <cmath>
 #include <fmt/format.h>
+#include <random>
 
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
+static thread_local std::mt19937 gen{std::random_device{}()};
+ 
+template<typename T>
+T random(T min, T max) {
+    return std::uniform_int_distribution<T>{min, max}(gen);
+}
 
 class DisjointSet
 {
- constexpr static double distanceThreshold = 0.05; // in meters
+ constexpr static double distanceThreshold = 0.5; // in meters
  constexpr static size_t nan_label = 0;
  constexpr static size_t point_unset= 424*512;
  constexpr static size_t label_reset = 1;
@@ -21,13 +28,16 @@ public:
     static inline size_t next_label = label_reset;
     int size = 0;
     int label = label_reset;
+    farsight::Point3fc::ColorType color;
     CategoryDescriptor()
     {
       if(next_label < max_catgory_number)
           label = next_label++;
       else
           label = max_catgory_number;
+      color.packed = random(0, (1<<24)-1);
     }
+
     CategoryDescriptor(int l)
     {
       label = l;
@@ -61,15 +71,26 @@ public:
   {
     auto f_label = from.label;
     auto t_label = to.label;
+    auto color= to.color;
     auto cat_size = categories.size();
     for(auto &cat : categories)
     {
         if(cat.label == f_label)
         {
-            assert(cat.label < cat_size);
             cat.label = t_label;
+            cat.color= color;
+            assert(cat.label < cat_size);
         }
     }
+  }
+
+  double
+  calcSquareMetric(const farsight::Point3f &p1, const farsight::Point3f &p2)
+  {
+    assert(!(std::isnan(p1.x) || std::isnan(p2.x)));
+
+    double val = sqrt(pow((p1.x - p2.x),2) + pow((p1.y - p2.y),2) +pow((p1.z - p2.z),2));
+    return val;
   }
 
   double
@@ -113,13 +134,14 @@ public:
   void
   addPoint(farsight::Point3f p)
   {
+    if(unlikely(categories.size() == 0))
+    {
+      // add default nan label for nan points
+      categories.emplace_back(nan_label);
+    }
+
     if(likely(std::isnan(p.x)))
     {
-      if(categories.size() == 0)
-      {
-        // add default nan label for nan points
-        categories.emplace_back(nan_label);
-      }
       categories[0].size += 1;
       points.emplace_back(p, 0);
       return;
@@ -162,7 +184,6 @@ public:
     // sum up all categories
     for(int i =1 ; i < cat_size; i++)
     {
-        fmt::print(stderr, "Found category with label {} \n", categories[i].label);
         assert(categories[i].label < cat_size);
 
         categories_lookup[categories[i].label] += categories[i].size;
@@ -192,19 +213,37 @@ public:
     auto label = c1.label;
     farsight::PointArray map;
     int counter = 0;
+    farsight::Point3fc::ColorType color;
+    farsight::Point3f nan_p = { NAN, NAN, NAN};
     for (auto &dp : points)
     {
       auto p_label = categories[dp.category].label;
       if (label == p_label)
       {
         counter++;
-        map.push_back(dp.p);
+        color.packed = 0xff0000;
+        map.emplace_back(dp.p, color);
 
       }else{
-        map.push_back({ NAN, NAN, NAN});
+        color.packed = 0x0;
+        map.emplace_back(nan_p, color);
       }
     }
     fmt::print("Counter number updated: {}\n", counter);
+    return map;
+  }
+
+  farsight::PointArray
+  getFilteredPointsColors(CategoryDescriptor &c1)
+  {
+    auto label = c1.label;
+    farsight::PointArray map;
+    int counter = 0;
+    for (auto &dp : points)
+    {
+      auto color = categories[dp.category].color;
+      map.emplace_back(dp.p, color);
+    }
     return map;
   }
 
