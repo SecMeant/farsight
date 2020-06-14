@@ -106,11 +106,12 @@ matrix_at(const float *mat, size_t x, size_t y, size_t w)
   return pixel_ptr;
 }
 
-static Point3f
-matrix_point_at(const Point3f *mat, size_t x, size_t y, size_t w)
+template <typename T>
+static T
+matrix_point_at(const T *mat, size_t x, size_t y, size_t w)
 {
   auto offset = x + y * w;
-  return *(reinterpret_cast<const Point3f *>(mat) + offset);
+  return *(reinterpret_cast<const T*>(mat) + offset);
 }
 
 static void
@@ -122,12 +123,11 @@ drawpoints(const CameraShot &cs)
   size_t h = cs.points.size() / w;
 
   glBegin(GL_POINTS);
-  glColor3f(1.0f, 1.0f, 1.0f);
 
   for (size_t j = 0; j < h - 1; ++j)
     for (size_t i = 0; i < w - 1; ++i)
     {
-      Point3f p_ = matrix_point_at(cs.points.data(), i, j, w);
+      Point3fc p_ = matrix_point_at<Point3fc>(cs.points.data(), i, j, w);
       glm::vec3 p {p_.x, p_.y, p_.z};
 
       if (std::isnan(p.z))
@@ -143,6 +143,9 @@ drawpoints(const CameraShot &cs)
 
       if (p.y <= (FLOOR_BASE_Y + cs.floor_level))
         continue;
+
+      Point3fc::ColorType color = p_.color;
+      glColor3i(color.r, color.g, color.b);
 
       glVertex3f(p.x,p.y,p.z);
     }

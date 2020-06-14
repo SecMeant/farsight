@@ -58,12 +58,12 @@ namespace farsight {
 
   struct Point3fc : public Point3f
   {
-    using ColorType = uint32_t;
+    using ColorType = union { struct { uint8_t r,g,b; }; uint32_t packed; };
 
-    static constexpr ColorType RED = 0xff0000;
-    static constexpr ColorType GREEN = 0x00ff00;
-    static constexpr ColorType BLUE = 0x0000ff;
-    static constexpr ColorType BLACK = 0x000000;
+    static constexpr ColorType RED = ColorType {{.r = 0xff, .g = 0x00, .b = 0x00}};
+    static constexpr ColorType GREEN = ColorType {{.r = 0x00, .g = 0xff, .b = 0x00}};
+    static constexpr ColorType BLUE = ColorType {{.r = 0x00, .g = 0x00, .b = 0xff}};
+    static constexpr ColorType BLACK = ColorType {{.r = 0x00, .g = 0x00, .b = 0x00}};
 
     ColorType color = BLACK;
 
