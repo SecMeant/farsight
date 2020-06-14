@@ -15,7 +15,17 @@ namespace farsight {
  
   struct Point3f
   {
-    float x, y, z;
+    using CoordType = float;
+
+    union
+    {
+      struct
+      {
+        CoordType x, y, z;
+      };
+
+      CoordType arr[3];
+    };
 
     Point3f() = default;
 
@@ -25,7 +35,7 @@ namespace farsight {
     , z(v.z)
     {}
 
-    Point3f(float x, float y, float z)
+    Point3f(CoordType x, CoordType y, CoordType z)
     : x(x)
     , y(y)
     , z(z)
@@ -41,6 +51,64 @@ namespace farsight {
       this->x += v.x;
       this->y += v.y;
       this->z += v.z;
+
+      return *this;
+    }
+  };
+
+  struct Point3fc : public Point3f
+  {
+    using ColorType = uint32_t;
+
+    static constexpr ColorType RED = 0xff0000;
+    static constexpr ColorType GREEN = 0x00ff00;
+    static constexpr ColorType BLUE = 0x0000ff;
+    static constexpr ColorType BLACK = 0x000000;
+
+    ColorType color = BLACK;
+
+    Point3fc() = default;
+
+    Point3fc(glm::vec3 v, ColorType color)
+    : Point3f(v)
+    , color(color)
+    {}
+
+    Point3fc(float x, float y, float z, ColorType color)
+    : Point3f(x,y,z)
+    , color(color)
+    {}
+
+    Point3fc(Point3f p3)
+    : Point3f(p3)
+    , color(BLACK)
+    {}
+
+    Point3fc(std::initializer_list<CoordType> il)
+    {
+      auto size = std::min(std::size(this->arr), std::size(il));
+      std::copy(std::begin(il), std::begin(il) + size, this->arr);
+    }
+
+    operator glm::vec3() const
+    {
+      return glm::vec3{x,y,z};
+    }
+
+    Point3fc& operator+=(const glm::vec3 &v)
+    {
+      this->x += v.x;
+      this->y += v.y;
+      this->z += v.z;
+
+      return *this;
+    }
+
+    Point3fc& operator=(const glm::vec3 &v)
+    {
+      this->x = v.x;
+      this->y = v.y;
+      this->z = v.z;
 
       return *this;
     }
@@ -68,12 +136,13 @@ namespace farsight {
     }
   };
 
-  using PointArray = std::vector<Point3f>;
+  using PointArraySimple = std::vector<Point3f>;
+  using PointArray = std::vector<Point3fc>;
 
   struct CameraShot
   {
     size_t width = 1;
-    std::vector<Point3f> points {{0,0,0}};
+    PointArray points {{0,0,0, Point3fc::BLACK}};
     glm::vec3 tvec {0.0f, 0.0f, 0.0f};
     glm::vec3 rvec {0.0f, 0.0f, 0.0f};
     float floor_level = 0.0f;
@@ -86,7 +155,7 @@ namespace farsight {
     using PointInfo = PointArray;
 
     void
-    update_cam1(std::vector<Point3f> &&points, size_t width)
+    update_cam1(PointArray &&points, size_t width)
     {
       std::unique_lock lck{ this->mtx };
 
@@ -95,7 +164,7 @@ namespace farsight {
     }
 
     void
-    update_cam2(std::vector<Point3f> &&points, size_t width)
+    update_cam2(PointArray &&points, size_t width)
     {
       std::unique_lock lck{ this->mtx };
 
@@ -119,7 +188,7 @@ namespace farsight {
     get_translated_points(const CameraShot &cam)
     {
       std::unique_lock lck{ this->mtx };
-      std::vector<Point3f> ret = cam.points;
+      auto ret = cam.points;
       lck.unlock();
 
       glm::vec3 tvec = this->camshot1.tvec;
@@ -134,8 +203,11 @@ namespace farsight {
         point = glm::rotateY(static_cast<glm::vec3>(point), rvec.y);
         point = glm::rotateZ(static_cast<glm::vec3>(point), rvec.z);
 
-        if (point.y <= (FLOOR_BASE_Y + cam.floor_level))
-          point = {NAN, NAN, NAN};
+        if (point.y <= (FLOOR_BASE_Y + cam.floor_level)) {
+          point.x = NAN;
+          point.y = NAN;
+          point.z = NAN;
+        }
       }
 
       return ret;

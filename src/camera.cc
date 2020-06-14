@@ -98,7 +98,7 @@ namespace farsight {
   }
 
   void
-  camera2real(std::vector<Point3f> &points,
+  camera2real(PointArray &points,
               glm::vec3 tvec,
               glm::mat3x3 rot,
               int id)

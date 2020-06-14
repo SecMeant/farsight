@@ -17,13 +17,25 @@ namespace farsight {
   init3d();
 
   inline void
-  update_points_cam1(std::vector<farsight::Point3f> points, size_t width)
+  update_points_cam1(PointArraySimple points, size_t width)
+  {
+    context3D.update_cam1(PointArray(std::begin(points), std::end(points)), width);
+  }
+
+  inline void
+  update_points_cam1(PointArray points, size_t width)
   {
     context3D.update_cam1(std::move(points), width);
   }
 
   inline void
-  update_points_cam2(std::vector<farsight::Point3f> points, size_t width)
+  update_points_cam2(PointArraySimple points, size_t width)
+  {
+    context3D.update_cam1(PointArray(std::begin(points), std::end(points)), width);
+  }
+
+  inline void
+  update_points_cam2(PointArray points, size_t width)
   {
     context3D.update_cam2(std::move(points), width);
   }
