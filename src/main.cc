@@ -467,17 +467,6 @@ createPointMaping(const libfreenect2::Registration &reg,
   auto cat = classifier.findBiggestCategory();
   pointMap = classifier.getFilteredPoints(cat);
   
-  if (cam == 0)
-  {
-    farsight::update_points_cam1(pointMap, depth_width);
-    pointMap = farsight::get_translated_points_cam1();
-  }
-  else
-  {
-      farsight::update_points_cam2(pointMap, depth_width);
-      pointMap = farsight::get_translated_points_cam2();
-  }
-   
   return pointMap;
 }
 
@@ -616,13 +605,14 @@ main(int argc, char **argv)
     switch (c)
     {
       case 'e':
-        calibrateArucoColor();
-        calibrateArucoIr();
-        break;
-      case 'c': {
+        fmt::print("calibration started");
         cv::glob("../../../aruco/*.jpg", images);
         cv::glob("../../../aruco_ir/*.jpg", images_ir);
-        fmt::print("calibration started");
+        calibrateArucoColor();
+        calibrateArucoIr();
+        arucoCalibrated = true;
+        break;
+      case 'c': {
         cv::Vec3d tvec;
         cv::Vec3d rvec;
         cv::FileStorage storage(arucoConfigPath, cv::FileStorage::WRITE);
@@ -678,7 +668,7 @@ main(int argc, char **argv)
         storage << "face_id_2" << dec.getCameraFaceID(1);
         storage << "distance" << distance;
         storage << "floor_level" << floor_level;
-        //calibrateCamera(k_dev);
+        calibrateCamera(k_dev);
         storage.release();
         arucoCalibrated = true;
       }

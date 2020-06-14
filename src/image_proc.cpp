@@ -79,15 +79,15 @@ detector::calcBiggestComponent()
   
   if(!c1.configured || !c2.configured)
     return;
-  farsight::PointArray map_front, map_top;
+  farsight::PointArray map_;
   std::vector<cv::Point2f> pointsCloudTop;
   std::vector<cv::Point2f> pointsCloudFront;
 
   std::copy(
-    c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_front));
-  std::copy(
-    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_front));
-  for(auto &p :map_front)
+    c1.pointCloud.begin(), c1.pointCloud.end(), std::back_inserter(map_));
+  //std::copy(
+  // c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
+  for(auto &p :map_)
   {
     if(std::isnan(p.x))
         continue;
@@ -107,7 +107,34 @@ detector::calcBiggestComponent()
   auto rectTop = cv::minAreaRect(pointsCloudTop);
   auto obj_width = rectTop.size.width;
   auto obj_length = rectTop.size.height;
-  fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
+  fmt::print("Found object size1 : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
+  
+  map_.clear();
+  pointsCloudFront.clear();
+  pointsCloudTop.clear();
+  std::copy(
+    c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
+  for(auto &p :map_)
+  {
+    if(std::isnan(p.x))
+        continue;
+    pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
+    pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
+  }
+
+  if(pointsCloudTop.size() == 0 || pointsCloudFront.size()==0)
+  {
+      fprintf(stderr, "No points found");
+      return;
+  }
+
+  rectFront = cv::minAreaRect(pointsCloudFront);
+  obj_height = rectFront.size.height;
+
+  rectTop = cv::minAreaRect(pointsCloudTop);
+  obj_width = rectTop.size.width;
+  obj_length = rectTop.size.height;
+  fmt::print("Found object size2 : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
 }
 
 void

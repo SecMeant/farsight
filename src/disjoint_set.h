@@ -11,6 +11,7 @@ class DisjointSet
 {
  constexpr static double distanceThreshold = 0.05; // in meters
  constexpr static size_t nan_label = 0;
+ constexpr static size_t point_unset= 424*512;
  constexpr static size_t label_reset = 1;
  constexpr static size_t max_catgory_number = 255;
  
@@ -42,17 +43,17 @@ public:
   struct DisjointPoint
   {
     farsight::Point3f p;
-    CategoryDescriptor *category;
+    size_t category = point_unset;
 
     DisjointPoint() =delete;
 
     DisjointPoint(farsight::Point3f &p1)
       : p(p1)
-      , category(nullptr)
+      , category(point_unset)
     {}
-    DisjointPoint(farsight::Point3f &p1, CategoryDescriptor &cd)
+    DisjointPoint(farsight::Point3f &p1, size_t cat)
       : p(p1)
-      , category(&cd)
+      , category(cat)
     {}
   };
 
@@ -60,11 +61,12 @@ public:
   {
     auto f_label = from.label;
     auto t_label = to.label;
+    auto cat_size = categories.size();
     for(auto &cat : categories)
     {
         if(cat.label == f_label)
         {
-            assert(cat.label < categories.size());
+            assert(cat.label < cat_size);
             cat.label = t_label;
         }
     }
@@ -92,15 +94,15 @@ public:
         continue;
       }
 
-      if (p_tmp.category == nullptr)
+      if (p_tmp.category == point_unset)
       {
         p_tmp.category = dp.category;
         continue;
       }
 
-      if(p_tmp.category->label != dp.category->label)
+      if(categories[p_tmp.category].label != categories[dp.category].label)
       {
-        fixCategory(*dp.category, *p_tmp.category);
+        fixCategory(categories[dp.category], categories[p_tmp.category]);
       }
     }
     // if is already attached and can be merged to another group
@@ -113,8 +115,13 @@ public:
   {
     if(likely(std::isnan(p.x)))
     {
+      if(categories.size() == 0)
+      {
+        // add default nan label for nan points
+        categories.emplace_back(nan_label);
+      }
       categories[0].size += 1;
-      points.emplace_back(p, categories[0]);
+      points.emplace_back(p, 0);
       return;
     }
     // if set is empty, create new classification group
@@ -122,22 +129,22 @@ public:
     {
       categories.emplace_back();
       categories[1].size = 1;
-      points.emplace_back(p, categories[1]);
+      points.emplace_back(p, 1);
       return;
     }
 
     auto classified_p = classify(p);
 
-    if (classified_p.category == nullptr)
+    if (classified_p.category == point_unset)
     {
         // create new group
         categories.emplace_back();
         auto &cat = categories.back();
         cat.size = 1;
-        classified_p.category = &cat;
+        classified_p.category = categories.size()-1;
     }else
     {
-        classified_p.category->size += 1;
+        categories[classified_p.category].size += 1;
     }
     points.push_back(classified_p);
   }
@@ -187,11 +194,12 @@ public:
     int counter = 0;
     for (auto &dp : points)
     {
-      auto p_label = dp.category->label;
+      auto p_label = categories[dp.category].label;
       if (label == p_label)
       {
         counter++;
         map.push_back(dp.p);
+
       }else{
         map.push_back({ NAN, NAN, NAN});
       }
@@ -205,14 +213,6 @@ public:
     points.clear();
     categories.clear();
     CategoryDescriptor::next_label = label_reset;
-    // add default nan label for nan points
-    categories.emplace_back(nan_label);
-  }
-
-  DisjointSet()
-  {
-      // add default nan label for nan points
-      categories.emplace_back(nan_label);
   }
 
 private:
