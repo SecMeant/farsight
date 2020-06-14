@@ -197,8 +197,8 @@ namespace farsight {
       auto ret = cam.points;
       lck.unlock();
 
-      glm::vec3 tvec = this->camshot1.tvec;
-      glm::vec3 rvec = this->camshot1.rvec;
+      glm::vec3 tvec = cam.tvec;
+      glm::vec3 rvec = cam.rvec;
 
       for (auto &point : ret)
       {
