@@ -144,7 +144,7 @@ namespace farsight {
           continue;
 
         Point3fc::ColorType color = p_.color;
-        glColor3i(color.r, color.g, color.b);
+        glColor3ub(color.r, color.g, color.b);
 
         glVertex3f(p.x, p.y, p.z);
       }

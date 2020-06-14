@@ -71,10 +71,10 @@ namespace farsight {
       ColorType{ { .r = 0x00, .g = 0xff, .b = 0x00 } };
     static constexpr ColorType BLUE =
       ColorType{ { .r = 0x00, .g = 0x00, .b = 0xff } };
-    static constexpr ColorType BLACK =
-      ColorType{ { .r = 0x00, .g = 0x00, .b = 0x00 } };
+    static constexpr ColorType WHITE =
+      ColorType{ { .r = 0xff, .g = 0xff, .b = 0xff } };
 
-    ColorType color = BLACK;
+    ColorType color = WHITE;
 
     Point3fc() = default;
 
@@ -90,7 +90,7 @@ namespace farsight {
 
     Point3fc(Point3f p3)
       : Point3f(p3)
-      , color(BLACK)
+      , color(WHITE)
     {}
 
     Point3fc(std::initializer_list<CoordType> il)
@@ -147,7 +147,7 @@ namespace farsight {
   struct CameraShot
   {
     size_t width = 1;
-    PointArray points{ { 0, 0, 0, Point3fc::BLACK } };
+    PointArray points{ { 0, 0, 0, Point3fc::WHITE } };
     glm::vec3 tvec{ 0.0f, 0.0f, 0.0f };
     glm::vec3 rvec{ 0.0f, 0.0f, 0.0f };
     float floor_level = 0.0f;
