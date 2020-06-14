@@ -97,57 +97,33 @@ namespace farsight {
     glEnd();
   }
 
-  static const float *
-  matrix_at(const float *mat, size_t x, size_t y, size_t w)
-  {
-    auto offset = x + y * w;
-    auto pixel_ptr = static_cast<const float *>(mat + offset);
-    return pixel_ptr;
-  }
-
-  template<typename T>
-  static T
-  matrix_point_at(const T *mat, size_t x, size_t y, size_t w)
-  {
-    auto offset = x + y * w;
-    return *(reinterpret_cast<const T *>(mat) + offset);
-  }
-
   static void
   drawpoints(const CameraShot &cs)
   {
-    auto w = cs.width;
-    size_t i = 0;
-    size_t j = 0;
-    size_t h = cs.points.size() / w;
-
     glBegin(GL_POINTS);
 
-    for (size_t j = 0; j < h - 1; ++j)
-      for (size_t i = 0; i < w - 1; ++i)
-      {
-        Point3fc p_ = matrix_point_at<Point3fc>(cs.points.data(), i, j, w);
-        glm::vec3 p{ p_.x, p_.y, p_.z };
+    for (auto &p_ : cs.points)
+    {
+      glm::vec3 p = p_;
+      auto color = p_.color;
 
-        if (std::isnan(p.z))
-          continue;
+      if (unlikely(std::isnan(p.z)))
+        continue;
 
-        p.x += cs.tvec.x;
-        p.y += cs.tvec.y;
-        p.z += cs.tvec.z;
+      p.x += cs.tvec.x;
+      p.y += cs.tvec.y;
+      p.z += cs.tvec.z;
 
-        p = glm::rotateX(p, cs.rvec.x);
-        p = glm::rotateY(p, cs.rvec.y);
-        p = glm::rotateZ(p, cs.rvec.z);
+      p = glm::rotateX(static_cast<glm::vec3>(p), cs.rvec.x);
+      p = glm::rotateY(static_cast<glm::vec3>(p), cs.rvec.y);
+      p = glm::rotateZ(static_cast<glm::vec3>(p), cs.rvec.z);
 
-        if (p.y <= (FLOOR_BASE_Y + cs.floor_level))
-          continue;
+      if (p.y <= (FLOOR_BASE_Y + cs.floor_level))
+        continue;
 
-        Point3fc::ColorType color = p_.color;
-        glColor3ub(color.r, color.g, color.b);
-
-        glVertex3f(p.x, p.y, p.z);
-      }
+      glColor3ub(color.r, color.g, color.b);
+      glVertex3f(p.x, p.y, p.z);
+    }
 
     glEnd();
   }

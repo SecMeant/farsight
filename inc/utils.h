@@ -2,6 +2,9 @@
 
 #include <unistd.h>
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 static int
 read_all(int fd, void *output, size_t size)
 {
