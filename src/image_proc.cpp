@@ -90,7 +90,7 @@ detector::calcBiggestComponent()
   {
     if(std::isnan(p.x))
         continue;
-    fmt::print(file, "{} {} {}\n", p.x*1000, p.y*1000, p.y*1000);
+    fmt::print(file, "{} {} {}\n", p.x*1000, p.y*1000, p.z*1000);
     pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }
@@ -104,7 +104,7 @@ detector::calcBiggestComponent()
   {
     if(std::isnan(p.x))
         continue;
-    fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.y*1000);
+    fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.z*1000);
     pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }
@@ -122,7 +122,7 @@ detector::calcBiggestComponent()
   {
     if(std::isnan(p.x))
         continue;
-    fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.y*1000);
+    fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.z*1000);
     pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }

@@ -73,7 +73,6 @@ std::vector<cv::String> images;
 std::vector<cv::String> images_ir;
 std::vector<cv::Mat> arucoDict;
 std::vector<std::vector<cv::Point2f>> corners;
-
 using namespace cv;
 
 void
@@ -468,6 +467,7 @@ createPointMaping(const libfreenect2::Registration &reg,
   pointMap = classifier.getFilteredPoints(cat);
   if (cam == 0)
   {
+
     farsight::update_points_cam1(pointMap, depth_width);
   }
   else
@@ -482,6 +482,7 @@ static void
 on_trackbar(int, void *)
 {
   floor_level = double(floor_level_raw) / floor_level_max;
+  farsight::set_floor_level(floor_level);
   fmt::print("CURRENT FLOOR LEVE {}\n", floor_level);
 }
 
@@ -739,12 +740,7 @@ main(int argc, char **argv)
         storage["distance"] >> distance;
         storage["floor_level"] >> floor_level;
         storage.release();
-
         arucoCalibrated = true;
-      }
-      break;
-      case 'x': {
-        farsight::set_floor_level(floor_level);
       }
       break;
       case '1':
