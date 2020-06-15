@@ -325,7 +325,7 @@ namespace farsight {
     }
 
     void
-    mark(Rectfc rect, glm::vec3 tvec = {0.0f, 0.0f, 0.0f}, glm::vec3 rvec = {0.0f, 0.0f, 0.0f})
+    mark(Rectfc rect, glm::vec3 tvec, glm::vec3 rvec)
     {
       std::unique_lock lck{ this->mtx };
 
