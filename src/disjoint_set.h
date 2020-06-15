@@ -16,7 +16,10 @@ T random(T min, T max) {
 
 class DisjointSet
 {
- constexpr static double distanceThreshold = 0.04; // in meters
+ using CategoryCounter = std::vector<int>;
+
+ double distanceThreshold = 0.02; // in meters
+ int objectValidSize = 100; // in meters
  constexpr static size_t nan_label = 0;
  constexpr static size_t point_unset= 424*512;
  constexpr static size_t label_reset = 1;
@@ -31,10 +34,7 @@ public:
     farsight::ColorType color;
     CategoryDescriptor()
     {
-      if(next_label < max_catgory_number)
-          label = next_label++;
-      else
-          label = max_catgory_number;
+      label = next_label++;
       color.packed = random(0, (1<<24)-1);
     }
 
@@ -91,6 +91,20 @@ public:
 
     double val = sqrt(pow((p1.x - p2.x),2) + pow((p1.y - p2.y),2) +pow((p1.z - p2.z),2));
     return val;
+  }
+
+  void
+  updateTreshold(double tr)
+  {
+    fmt::print("Current treshold: {}\n", tr);
+    distanceThreshold = tr;
+  }
+
+  void
+  updateValidSize(double size)
+  {
+    fmt::print("Size for valid object: {}\n", size);
+    objectValidSize = size;
   }
 
   double
@@ -157,7 +171,7 @@ public:
 
     auto classified_p = classify(p);
 
-    if (classified_p.category == point_unset)
+    if(classified_p.category == point_unset)
     {
         // create new group
         categories.emplace_back();
@@ -171,16 +185,16 @@ public:
     points.push_back(classified_p);
   }
 
-  CategoryDescriptor
-  findBiggestCategory()
+  CategoryCounter
+  countCategories()
   {
-    if (unlikely(categories.size() == 0))
+    if(unlikely(categories.size() == 0))
     {
         fmt::print(stderr, "No unions found");
         return {};
     }
     int cat_size = categories.size();
-    std::vector<int> categories_lookup(cat_size, 0);
+    CategoryCounter categories_lookup = CategoryCounter(cat_size, 0);
     // sum up all categories
     for(int i =1 ; i < cat_size; i++)
     {
@@ -188,20 +202,28 @@ public:
 
         categories_lookup[categories[i].label] += categories[i].size;
     }
+
+    return categories_lookup;
+  }
+
+  CategoryDescriptor
+  findBiggestCategory(CategoryCounter &cc)
+  {
+    int cat_size = categories.size();
     // find biggest category
     size_t max = 0, idx = 0;
     for(int i =1 ; i < cat_size; i++)
     {
-        if(max < categories_lookup[i])
+        if(max <cc[i])
         {
-            max = categories_lookup[i];
+            max =cc[i];
             idx = i;
         }
     }
 
     for(int i =0 ; i < categories.size(); i++)
     {
-        fmt::print("Category with label: {}, size: {}\n", i, categories_lookup[i]);
+        fmt::print("Category with label: {}, size: {}\n", i,cc[i]);
     }
 
     return categories[idx];
@@ -212,7 +234,6 @@ public:
   {
     auto label = c1.label;
     farsight::PointArray map;
-    int counter = 0;
     farsight::ColorType color;
     farsight::Point3f nan_p = { NAN, NAN, NAN};
     for (auto &dp : points)
@@ -220,7 +241,6 @@ public:
       auto p_label = categories[dp.category].label;
       if (label == p_label)
       {
-        counter++;
         color.packed = 0xdd88ff;
         map.emplace_back(dp.p, color);
       }else{
@@ -228,7 +248,27 @@ public:
         map.emplace_back(nan_p, color);
       }
     }
-    fmt::print("Counter number updated: {}\n", counter);
+    return map;
+  }
+
+  farsight::PointArray
+  getPointsByDelimiter(CategoryCounter &cc)
+  {
+    farsight::PointArray map;
+    farsight::ColorType color;
+    farsight::Point3f nan_p = { NAN, NAN, NAN};
+    for (auto &dp : points)
+    {
+      auto label= categories[dp.category].label;
+      if (cc[label] > objectValidSize)
+      {
+        color.packed = 0xdd88ff;
+        map.emplace_back(dp.p, color);
+      }else{
+        color.packed = 0x0;
+        map.emplace_back(nan_p, color);
+      }
+    }
     return map;
   }
 

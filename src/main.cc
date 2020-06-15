@@ -25,7 +25,7 @@
 #include <opencv2/photo.hpp>
 #include <thread>
 #include "disjoint_set.h"
-
+# define M_PI           3.14159265358979323846
 extern "C"
 {
 #include <signal.h>
@@ -44,7 +44,9 @@ static DisjointSet classifier;
 constexpr int waitTime = 50;
 
 const int floor_level_max = 1000;
-static int floor_level_raw;
+static int floor_level_raw = 0;
+static int disjointTreshold = 0;
+static int disjointSetValidSize= 0;
 // Defining the dimensions of checkerboard
 static int CHECKERBOARD[2]{ 8, 6 };
 static cv::Mat cameraMatrix, distCoeffs;
@@ -463,8 +465,9 @@ createPointMaping(const libfreenect2::Registration &reg,
         classifier.addPoint(p); 
   }
 
-  auto cat = classifier.findBiggestCategory();
-  pointMap = classifier.getFilteredPoints(cat);
+  auto cat_sizes = classifier.countCategories();
+  pointMap = classifier.getPointsByDelimiter(cat_sizes);
+
   if (cam == 0)
   {
     farsight::set_tvec_cam1({0,0,0});
@@ -487,6 +490,18 @@ on_trackbar(int, void *)
   floor_level = double(floor_level_raw) / floor_level_max;
   farsight::set_floor_level(floor_level);
   fmt::print("CURRENT FLOOR LEVEL {}\n", floor_level);
+}
+
+static void
+on_disjoint_treshold(int, void *)
+{
+    classifier.updateTreshold(disjointTreshold/100.0);
+}
+
+static void
+on_disjoint_valid_size(int, void *)
+{
+    classifier.updateValidSize(disjointSetValidSize);
 }
 
 void calibrateCamera(kinect &dev)
@@ -556,6 +571,16 @@ main(int argc, char **argv)
                  &floor_level_raw,
                  floor_level_max,
                  on_trackbar);
+  createTrackbar("Disjoint tresholds",
+                 "floor",
+                 &disjointTreshold,
+                 100,
+                 on_disjoint_treshold);
+  createTrackbar("Disjoint set valid size",
+                 "floor",
+                 &disjointSetValidSize,
+                 300,
+                 on_disjoint_valid_size);
 
   byte *depth_backup = nullptr;
   while (continue_flag.test_and_set() and c != 'q')
@@ -654,26 +679,22 @@ main(int argc, char **argv)
         rvec[2] = rot2.z;
         storage << "rvec_cam2" << rvec;
 
-        auto glvec1 = farsight::get_tvec_cam1();
-        tvec[0] = glvec1.x;
-        tvec[1] = glvec1.y;
-        tvec[2] = glvec1.z;
+        tvec[0] = cam1_tvec.x;
+        tvec[1] = cam1_tvec.y;
+        tvec[2] = cam1_tvec.z;
         storage << "glvec_cam1" << tvec;
-        auto glvec2 = farsight::get_tvec_cam2();
-        tvec[0] = glvec2.x;
-        tvec[1] = glvec2.y;
-        tvec[2] = glvec2.z;
+        tvec[0] = cam2_tvec.x;
+        tvec[1] = cam2_tvec.y;
+        tvec[2] = cam2_tvec.z;
         storage << "glvec_cam2" << tvec;
 
-        auto glrot1 = farsight::get_rvec_cam1();
-        tvec[0] = glrot1.x;
-        tvec[1] = glrot1.y;
-        tvec[2] = glrot1.z;
+        tvec[0] = cam1_rvec.x;
+        tvec[1] = cam1_rvec.y;
+        tvec[2] = cam1_rvec.z;
         storage << "glrot_cam1" << tvec;
-        auto glrot2 = farsight::get_rvec_cam2();
-        tvec[0] = glrot2.x;
-        tvec[1] = glrot2.y;
-        tvec[2] = glrot2.z;
+        tvec[0] = cam2_rvec.x;
+        tvec[1] = cam2_rvec.y;
+        tvec[2] = cam2_rvec.z;
         storage << "glrot_cam2" << tvec;
 
         storage << "face_id_1" << dec.getCameraFaceID(0);
@@ -807,7 +828,48 @@ main(int argc, char **argv)
         dec.setConfig(
           selectedKinnect, objectType::REFERENCE_OBJ, depth_cpy, detectedBox, realPoints);
         dec.displayCurrectConfig();
-        dec.calcBiggestComponent();
+        auto minRect = dec.calcBiggestComponent();
+        auto mass_center = minRect.center;
+        mass_center.x/=1000;
+        mass_center.y/=1000;
+        auto angle = minRect.angle;
+        double obj_width = minRect.size.width/1000.0;
+        double obj_height = minRect.size.height/1000.0;
+        fmt::print("MASS CENETER {} {}\n", mass_center.x, mass_center.y);
+
+        farsight::Rectfc corners;
+        corners.verts[0] = {
+          static_cast<float>(mass_center.x + obj_width / 2),
+          0.0,
+          static_cast<float>(mass_center.y + obj_height / 2),
+          farsight::WHITE
+        };
+        corners.verts[1] = {
+          static_cast<float>(mass_center.x + obj_width / 2),
+          0.0,
+          static_cast<float>(mass_center.y - obj_height / 2),
+          farsight::WHITE
+        };
+        corners.verts[2] = {
+          static_cast<float>(mass_center.x - obj_width / 2),
+          0.0,
+          static_cast<float>(mass_center.y - obj_height / 2),
+          farsight::WHITE
+        };
+        corners.verts[3] = {
+          static_cast<float>(mass_center.x - obj_width / 2),
+          0.0,
+          static_cast<float>(mass_center.y + obj_height / 2),
+          farsight::WHITE
+        };
+        glm::vec3 rotRectMat = {0.0,(M_PI/180)*angle, 0.0};
+        fmt::print("RECT CORNER_1 {} {} {}\n", corners.verts[0].x, corners.verts[0].y, corners.verts[0].z);
+        fmt::print("RECT CORNER_2 {} {} {}\n", corners.verts[1].x, corners.verts[1].y, corners.verts[1].z);
+        fmt::print("RECT CORNER_3 {} {} {}\n", corners.verts[2].x, corners.verts[2].y, corners.verts[2].z);
+        fmt::print("RECT CORNER_4 {} {} {}\n", corners.verts[3].x, corners.verts[3].y, corners.verts[3].z);
+        fmt::print("Corner angle {}\n", rotRectMat.y);
+        farsight::reset_marks();
+        farsight::add_marker(corners, {0,0,0}, rotRectMat);
       }
       break;
       case '1':

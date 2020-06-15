@@ -11,7 +11,6 @@ public:
   static inline const double box_size = 0.5;
   // public methods
   detector();
-
   bbox
   detect(int kinectID,
          byte *frame_object,
@@ -23,7 +22,7 @@ public:
             const cv::Mat &imgDepth,
             const bbox &a,
             const farsight::PointArray &flattened);
-  farsight::PointArray
+  cv::RotatedRect 
   calcBiggestComponent();
   void
   displayCurrectConfig();
