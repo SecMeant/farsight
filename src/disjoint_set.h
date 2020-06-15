@@ -28,7 +28,7 @@ public:
     static inline size_t next_label = label_reset;
     int size = 0;
     int label = label_reset;
-    farsight::Point3fc::ColorType color;
+    farsight::ColorType color;
     CategoryDescriptor()
     {
       if(next_label < max_catgory_number)
@@ -213,7 +213,7 @@ public:
     auto label = c1.label;
     farsight::PointArray map;
     int counter = 0;
-    farsight::Point3fc::ColorType color;
+    farsight::ColorType color;
     farsight::Point3f nan_p = { NAN, NAN, NAN};
     for (auto &dp : points)
     {

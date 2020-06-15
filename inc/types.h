@@ -54,26 +54,26 @@ namespace farsight {
     }
   };
 
+  union ColorType
+  {
+    struct
+    {
+      uint8_t r, g, b;
+    };
+    uint32_t packed;
+  };
+
+  constexpr ColorType RED =
+    ColorType{ { .r = 0xff, .g = 0x00, .b = 0x00 } };
+  constexpr ColorType GREEN =
+    ColorType{ { .r = 0x00, .g = 0xff, .b = 0x00 } };
+  constexpr ColorType BLUE =
+    ColorType{ { .r = 0x00, .g = 0x00, .b = 0xff } };
+  constexpr ColorType WHITE =
+    ColorType{ { .r = 0xff, .g = 0xff, .b = 0xff } };
+
   struct Point3fc : public Point3f
   {
-    using ColorType = union
-    {
-      struct
-      {
-        uint8_t r, g, b;
-      };
-      uint32_t packed;
-    };
-
-    static constexpr ColorType RED =
-      ColorType{ { .r = 0xff, .g = 0x00, .b = 0x00 } };
-    static constexpr ColorType GREEN =
-      ColorType{ { .r = 0x00, .g = 0xff, .b = 0x00 } };
-    static constexpr ColorType BLUE =
-      ColorType{ { .r = 0x00, .g = 0x00, .b = 0xff } };
-    static constexpr ColorType WHITE =
-      ColorType{ { .r = 0xff, .g = 0xff, .b = 0xff } };
-
     ColorType color = WHITE;
 
     Point3fc() = default;
@@ -141,13 +141,21 @@ namespace farsight {
     operator glm::vec2() const { return glm::vec2{ x, y }; }
   };
 
+  struct Rectfc
+  {
+    std::array<Point3fc, 4> verts;
+    ColorType color = WHITE;
+  };
+
   using PointArraySimple = std::vector<Point3f>;
+  using RectArraySimple = std::vector<Rectfc>;
   using PointArray = std::vector<Point3fc>;
+  using RectArray = std::vector<Rectfc>;
 
   struct CameraShot
   {
     size_t width = 1;
-    PointArray points{ { 0, 0, 0, Point3fc::WHITE } };
+    PointArray points{ { 0, 0, 0, WHITE } };
     glm::vec3 tvec{ 0.0f, 0.0f, 0.0f };
     glm::vec3 rvec{ 0.0f, 0.0f, 0.0f };
     float floor_level = 0.0f;
@@ -159,6 +167,10 @@ namespace farsight {
     using PointInfoLocked =
       std::tuple<std::unique_lock<std::mutex>, CameraShot &>;
     using PointInfo = PointArray;
+
+    using MarkInfoLocked =
+      std::tuple<std::unique_lock<std::mutex>, RectArray &>;
+    using MarkInfo = RectArray;
 
     void
     update_cam1(PointArray &&points, size_t width)
@@ -188,6 +200,12 @@ namespace farsight {
     get_points_cam2()
     {
       return { std::unique_lock(this->mtx), this->camshot2 };
+    }
+
+    MarkInfoLocked
+    get_marks()
+    {
+      return { std::unique_lock(this->mtx), this->marks };
     }
 
     PointInfo
@@ -306,9 +324,33 @@ namespace farsight {
       return this->camshot1.floor_level;
     }
 
+    void
+    mark(Rectfc rect, glm::vec3 tvec = {0.0f, 0.0f, 0.0f}, glm::vec3 rvec = {0.0f, 0.0f, 0.0f})
+    {
+      std::unique_lock lck{ this->mtx };
+
+      for (auto &v : rect.verts) {
+        v += tvec;
+
+        v = glm::rotateX(static_cast<glm::vec3>(v), rvec.x);
+        v = glm::rotateY(static_cast<glm::vec3>(v), rvec.y);
+        v = glm::rotateZ(static_cast<glm::vec3>(v), rvec.z);
+      }
+
+      marks.emplace_back(std::move(rect));
+    }
+
+    void
+    reset_marks()
+    {
+      std::unique_lock lck{ this->mtx };
+      marks.clear();
+    }
+
   private:
     mutable std::mutex mtx;
     CameraShot camshot1, camshot2;
+    RectArray marks;
   };
 
 } // namespace farsight
