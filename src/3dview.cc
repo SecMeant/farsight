@@ -114,9 +114,9 @@ namespace farsight {
       p.y += cs.tvec.y;
       p.z += cs.tvec.z;
 
-      p = glm::rotateX(static_cast<glm::vec3>(p), cs.rvec.x);
-      p = glm::rotateY(static_cast<glm::vec3>(p), cs.rvec.y);
-      p = glm::rotateZ(static_cast<glm::vec3>(p), cs.rvec.z);
+      p = glm::rotateX(p, cs.rvec.x);
+      p = glm::rotateY(p, cs.rvec.y);
+      p = glm::rotateZ(p, cs.rvec.z);
 
       if (p.y <= (FLOOR_BASE_Y + cs.floor_level))
         continue;
@@ -126,6 +126,29 @@ namespace farsight {
     }
 
     glEnd();
+  }
+
+  static void
+  drawmarks(const RectArray &marks)
+  {
+    using VertType = decltype(marks[0].verts);
+
+    for (auto &m : marks)
+    {
+      glBegin(GL_LINE_LOOP);
+
+      VertType verts;
+      std::copy(std::begin(m.verts), std::end(m.verts), std::begin(verts));
+
+      auto color = m.color;
+
+      for (auto &v : verts) {
+        glColor3ub(color.r, color.g, color.b);
+        glVertex3f(v.x, v.y, v.z);
+      }
+
+      glEnd();
+    }
   }
 
   void
@@ -154,6 +177,11 @@ namespace farsight {
     {
       auto [lck, cs] = context3D.get_points_cam2();
       drawpoints(cs);
+    }
+
+    {
+      auto [lck, marks] = context3D.get_marks();
+      drawmarks(marks);
     }
 
     glFlush();
