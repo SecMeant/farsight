@@ -72,7 +72,7 @@ detector::setConfig(int kinectID,
   c.configured = true;
 }
 
-farsight::PointArray
+cv::RotatedRect
 detector::calcBiggestComponent()
 {
   auto &c1 = config[0].objects[to_underlying(objectType::REFERENCE_OBJ)];
@@ -141,15 +141,9 @@ detector::calcBiggestComponent()
   auto obj_width = rectTop.size.width;
   auto obj_length = rectTop.size.height;
 
-  auto mass_center = rectTop.center;
-  farsight::PointArray corners;
-  corners.push_back({static_cast<float>(mass_center.x + obj_width/2), static_cast<float>(mass_center.y + obj_height/2)});
-  corners.push_back({static_cast<float>(mass_center.x - obj_width/2), static_cast<float>(mass_center.y - obj_height/2)});
-  corners.push_back({static_cast<float>(mass_center.x + obj_width/2), static_cast<float>(mass_center.y - obj_height/2)});
-  corners.push_back({static_cast<float>(mass_center.x - obj_width/2), static_cast<float>(mass_center.y + obj_height/2)});
 
   fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, (obj_height*1000)+250, obj_length);
-  return corners;
+  return rectTop;
 }
 
 void
