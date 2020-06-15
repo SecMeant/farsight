@@ -16,7 +16,7 @@ T random(T min, T max) {
 
 class DisjointSet
 {
- constexpr static double distanceThreshold = 0.5; // in meters
+ constexpr static double distanceThreshold = 0.04; // in meters
  constexpr static size_t nan_label = 0;
  constexpr static size_t point_unset= 424*512;
  constexpr static size_t label_reset = 1;
@@ -221,9 +221,8 @@ public:
       if (label == p_label)
       {
         counter++;
-        color.packed = 0xff0000;
+        color.packed = 0xdd88ff;
         map.emplace_back(dp.p, color);
-
       }else{
         color.packed = 0x0;
         map.emplace_back(nan_p, color);
