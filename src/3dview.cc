@@ -100,6 +100,13 @@ namespace farsight {
   static void
   drawpoints(const CameraShot &cs)
   {
+    float max_x = std::numeric_limits<float>::min(),
+          max_y = std::numeric_limits<float>::min(),
+          max_z = std::numeric_limits<float>::min(),
+          min_x = std::numeric_limits<float>::max(),
+          min_y = std::numeric_limits<float>::max(),
+          min_z = std::numeric_limits<float>::max();
+
     glBegin(GL_POINTS);
 
     for (auto &p_ : cs.points)
@@ -123,7 +130,29 @@ namespace farsight {
 
       glColor3ub(color.r, color.g, color.b);
       glVertex3f(p.x, p.y, p.z);
+
+      max_x = std::max(max_x, p.x);
+      max_y = std::max(max_y, p.y);
+      max_z = std::max(max_z, p.z);
+
+      min_x = std::min(min_x, p.x);
+      min_y = std::min(min_y, p.y);
+      min_z = std::min(min_z, p.z);
     }
+
+    fmt::print("Drawing points: \n"
+               "\t max_x {}\n"
+               "\t max_y {}\n"
+               "\t max_z {}\n"
+               "\t min_x {}\n"
+               "\t min_y {}\n"
+               "\t min_z {}\n",
+               max_x,
+               max_y,
+               max_z,
+               min_x,
+               min_y,
+               min_z);
 
     glEnd();
   }
