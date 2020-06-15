@@ -23,7 +23,7 @@ public:
             const cv::Mat &imgDepth,
             const bbox &a,
             const farsight::PointArray &flattened);
-  void
+  farsight::PointArray
   calcBiggestComponent();
   void
   displayCurrectConfig();

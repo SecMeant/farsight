@@ -67,7 +67,7 @@ static const std::vector<char> base_scenario = { '1', 'b', '2',
 static const std::vector<char> meassure_scenario = { '1', 'n', '2', 'n',
                                                      '1', 'r', '2', 'r',
                                                       'e' };
-
+glm::vec3 cam1_tvec = {0,0,0}, cam2_tvec = {0,0,0}, cam1_rvec = {0,0,0}, cam2_rvec = {0,0,0}; 
 std::atomic_flag continue_flag;
 std::vector<cv::String> images;
 std::vector<cv::String> images_ir;
@@ -353,8 +353,6 @@ generateScene(const libfreenect2::Registration &reg,
   if (!tvecs.size() || !rvecs.size())
     return;
 
-  float nan = NAN;
-
   glm::vec3 gtvec = { tvec.x, tvec.y, tvec.z };
   cv::Vec3d rvec3d  = { rvec.x, rvec.y, rvec.z };
   cv::Mat r_mat;
@@ -385,7 +383,7 @@ generateScene(const libfreenect2::Registration &reg,
       }
       else
       {
-        pointMap.push_back({ nan, nan, nan });
+        pointMap.push_back({NAN, NAN, NAN});
       }
     }
   }
@@ -413,8 +411,6 @@ createPointMaping(const libfreenect2::Registration &reg,
 {
   farsight::Point3f p{ 0, 0, 0 };
   classifier.reset();
-
-  float nan = NAN;
 
   glm::vec3 gtvec = { tvec.x, tvec.y, tvec.z };
   cv::Vec3d rvec3d  = { rvec.x, rvec.y, rvec.z };
@@ -447,13 +443,17 @@ createPointMaping(const libfreenect2::Registration &reg,
   farsight::camera2real(pointMap, gtvec, grmat, id);
   if (cam == 0)
   {
+    farsight::set_tvec_cam1(cam1_tvec);
+    farsight::set_rvec_cam1(cam1_rvec);
     farsight::update_points_cam1(pointMap, depth_width);
     pointMap = farsight::get_translated_points_cam1();
   }
   else
   {
-      farsight::update_points_cam2(pointMap, depth_width);
-      pointMap = farsight::get_translated_points_cam2();
+    farsight::set_tvec_cam2(cam2_tvec);
+    farsight::set_rvec_cam2(cam2_rvec);
+    farsight::update_points_cam2(pointMap, depth_width);
+    pointMap = farsight::get_translated_points_cam2();
   }
   for(auto &p : pointMap)
   {
@@ -467,11 +467,14 @@ createPointMaping(const libfreenect2::Registration &reg,
   pointMap = classifier.getFilteredPoints(cat);
   if (cam == 0)
   {
-
+    farsight::set_tvec_cam1({0,0,0});
+    farsight::set_rvec_cam1({0,0,0});
     farsight::update_points_cam1(pointMap, depth_width);
   }
   else
   {
+    farsight::set_tvec_cam2({0,0,0});
+    farsight::set_rvec_cam2({0,0,0});
     farsight::update_points_cam2(pointMap, depth_width);
   }
   
@@ -483,7 +486,7 @@ on_trackbar(int, void *)
 {
   floor_level = double(floor_level_raw) / floor_level_max;
   farsight::set_floor_level(floor_level);
-  fmt::print("CURRENT FLOOR LEVE {}\n", floor_level);
+  fmt::print("CURRENT FLOOR LEVEL {}\n", floor_level);
 }
 
 void calibrateCamera(kinect &dev)
@@ -713,25 +716,25 @@ main(int argc, char **argv)
         pos.z = vec[2];
         dec.setCameraRot(1, pos);
         storage["glvec_cam1"] >> vec;
-        gpos.x = vec[0];
-        gpos.y = vec[1];
-        gpos.z = vec[2];
-        farsight::set_tvec_cam1(gpos);
+        cam1_tvec.x = vec[0];
+        cam1_tvec.y = vec[1];
+        cam1_tvec.z = vec[2];
+        farsight::set_tvec_cam1(cam1_tvec);
         storage["glvec_cam2"] >> vec;
-        gpos.x = vec[0];
-        gpos.y = vec[1];
-        gpos.z = vec[2];
-        farsight::set_tvec_cam2(gpos);
+        cam2_tvec.x = vec[0];
+        cam2_tvec.y = vec[1];
+        cam2_tvec.z = vec[2];
+        farsight::set_tvec_cam2(cam2_tvec);
         storage["glrot_cam1"] >> vec;
-        gpos.x = vec[0];
-        gpos.y = vec[1];
-        gpos.z = vec[2];
-        farsight::set_rvec_cam1(gpos);
+        cam1_rvec.x = vec[0];
+        cam1_rvec.y = vec[1];
+        cam1_rvec.z = vec[2];
+        farsight::set_rvec_cam1(cam1_rvec);
         storage["glrot_cam2"] >> vec;
-        gpos.x = vec[0];
-        gpos.y = vec[1];
-        gpos.z = vec[2];
-        farsight::set_rvec_cam2(gpos);
+        cam2_rvec.x = vec[0];
+        cam2_rvec.y = vec[1];
+        cam2_rvec.z = vec[2];
+        farsight::set_rvec_cam2(cam2_rvec);
         //calibrateCamera(k_dev);  
         storage["face_id_1"] >> faceid;
         dec.setCameraFaceID(0, faceid);
@@ -742,6 +745,16 @@ main(int argc, char **argv)
         storage.release();
         arucoCalibrated = true;
       }
+      break;
+      case 'x':
+        cam1_tvec += farsight::get_tvec_cam1();
+        cam1_rvec += farsight::get_rvec_cam1();
+        cam2_tvec += farsight::get_tvec_cam2();
+        cam2_rvec += farsight::get_rvec_cam2();
+        farsight::set_tvec_cam1({0,0,0});
+        farsight::set_tvec_cam1({0,0,0});
+        farsight::set_rvec_cam2({0,0,0});
+        farsight::set_rvec_cam2({0,0,0});
       break;
       case '1':
         if (k_dev.open(0))

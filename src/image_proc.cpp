@@ -1,6 +1,7 @@
 #include "image_proc.hpp"
 #include "3d.h"
 #include <fmt/format.h>
+#include <array>
 
 detector::detector()
 {
@@ -71,14 +72,14 @@ detector::setConfig(int kinectID,
   c.configured = true;
 }
 
-void
+farsight::PointArray
 detector::calcBiggestComponent()
 {
   auto &c1 = config[0].objects[to_underlying(objectType::REFERENCE_OBJ)];
   auto &c2 = config[1].objects[to_underlying(objectType::REFERENCE_OBJ)];
   
   if(!c1.configured || !c2.configured)
-    return;
+    return{};
   farsight::PointArray map_;
   std::vector<cv::Point2f> pointsCloudTop;
   std::vector<cv::Point2f> pointsCloudFront;
@@ -118,12 +119,14 @@ detector::calcBiggestComponent()
     c2.pointCloud.begin(), c2.pointCloud.end(), std::back_inserter(map_));
 
   FILE *file3 = fopen("point_cloud_2", "w");
+  double obj_height= 0;
   for(auto &p :map_)
   {
     if(std::isnan(p.x))
         continue;
     fmt::print(file2, "{} {} {}\n", p.x*1000, p.y*1000, p.z*1000);
-    pointsCloudFront.emplace_back(p.x*1000, p.y*1000);
+    if(p.y > obj_height)
+        obj_height = p.y;
     pointsCloudTop.emplace_back(p.x*1000, p.z*1000);
   }
   fclose(file3);
@@ -131,17 +134,22 @@ detector::calcBiggestComponent()
   if(pointsCloudTop.size() == 0 || pointsCloudFront.size() == 0)
   {
       fprintf(stderr, "No points found");
-      return;
+      return{};
   }
-
-  auto rectFront = cv::minAreaRect(pointsCloudFront);
-  auto obj_height = rectFront.size.height;
 
   auto rectTop = cv::minAreaRect(pointsCloudTop);
   auto obj_width = rectTop.size.width;
   auto obj_length = rectTop.size.height;
-  fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, obj_height, obj_length);
 
+  auto mass_center = rectTop.center;
+  farsight::PointArray corners;
+  corners.push_back({static_cast<float>(mass_center.x + obj_width/2), static_cast<float>(mass_center.y + obj_height/2)});
+  corners.push_back({static_cast<float>(mass_center.x - obj_width/2), static_cast<float>(mass_center.y - obj_height/2)});
+  corners.push_back({static_cast<float>(mass_center.x + obj_width/2), static_cast<float>(mass_center.y - obj_height/2)});
+  corners.push_back({static_cast<float>(mass_center.x - obj_width/2), static_cast<float>(mass_center.y + obj_height/2)});
+
+  fmt::print("Found object size : x:{} y:{} z:{}\n", obj_width, (obj_height*1000)+250, obj_length);
+  return corners;
 }
 
 void
