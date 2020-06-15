@@ -112,4 +112,16 @@ namespace farsight {
     return context3D.get_floor_level();
   }
 
+  inline void
+  add_marker(Rectfc rect, glm::vec3 tvec = {0.0f, 0.0f, 0.0f}, glm::vec3 rvec = {0.0f, 0.0f, 0.0f})
+  {
+    context3D.mark(rect, tvec, rvec);
+  }
+
+  inline void
+  reset_marks()
+  {
+    context3D.reset_marks();
+  }
+
 } // namespace farsight
