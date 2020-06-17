@@ -1,5 +1,5 @@
 # farsight
-test
+
 to install patched libusb run depends/install.sh
 
 to prepare environment for running locally source depends/init
