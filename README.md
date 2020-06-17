@@ -21,7 +21,18 @@ to properly configure usbcore run depends/fixusbcore.sh with proper privileges
  trackbar - you can use it to change floor level of current scene \
 
 ## OpenGL
-
+ wsad - move camera \
+ jk - move points from camera 1 in down/up direction (camera 2 with caps lock) \
+ hl - move points from camera 1 in left/right direction (camera 2 with caps lock) \
+ fg - move points from camera 1 in forward/backward direction (camera 2 with caps lock) \
+ \
+ x - rotate points from camera 1 around X axis (camera 2 with caps lock) \
+ y - rotate points from camera 1 around Y axis (camera 2 with caps lock) \
+ z - rotate points from camera 1 around Z axis (camera 2 with caps lock) \
+ \
+ -\+ - change speed of movement and rotation, '-' divides and '+' multiplies  current speed by 2 \
+ \
+ q - lock/unlock mouse inside opengl window \
 
 # Configuration
 1. First of all configure base image, you should assure that current scene is prepared and when it comes to meassurment the only new thing in current scene will be wanted object
